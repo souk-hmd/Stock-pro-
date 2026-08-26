@@ -1,0 +1,3798 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Stock Pro - إدارة المخزن والتجهيزات</title>
+
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<link rel="manifest" href="./manifest.json">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+
+:root{
+--primary:#2563eb;
+--primary-dark:#1d4ed8;
+--secondary:#64748b;
+--bg-dark:#0f172a;
+--bg-card:#1e293b;
+--bg-input:#334155;
+--text-main:#f8fafc;
+--text-muted:#94a3b8;
+--border:#475569;
+--danger:#ef4444;
+--warning:#f59e0b;
+--success:#10b981;
+}
+
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+html,body{
+min-height:100%;
+}
+
+body{
+background:var(--bg-dark);
+color:var(--text-main);
+direction:rtl;
+}
+
+button,
+input,
+select,
+textarea{
+font-family:inherit;
+}
+
+button{
+cursor:pointer;
+}
+
+.hidden{
+display:none!important;
+}
+
+/* ================= LOGIN ================= */
+
+#loginScreen{
+position:fixed;
+inset:0;
+background:var(--bg-dark);
+display:flex;
+align-items:center;
+justify-content:center;
+padding:1rem;
+z-index:9999;
+}
+
+.login-card{
+width:100%;
+max-width:420px;
+background:var(--bg-card);
+border:1px solid var(--border);
+border-radius:1rem;
+padding:2rem;
+box-shadow:0 20px 50px rgba(0,0,0,.35);
+}
+
+.login-logo{
+width:70px;
+height:70px;
+margin:0 auto 1rem;
+border-radius:18px;
+background:var(--primary);
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:2rem;
+}
+
+.login-title{
+text-align:center;
+font-size:1.5rem;
+font-weight:bold;
+margin-bottom:.4rem;
+}
+
+.login-subtitle{
+text-align:center;
+color:var(--text-muted);
+margin-bottom:1.5rem;
+}
+
+.login-group{
+margin-bottom:1rem;
+}
+
+.login-group label{
+display:block;
+margin-bottom:.4rem;
+}
+
+.password-wrap{
+position:relative;
+}
+
+.password-wrap input{
+width:100%;
+padding-left:3rem;
+}
+
+.password-toggle{
+position:absolute;
+left:.5rem;
+top:50%;
+transform:translateY(-50%);
+background:none;
+border:none;
+color:var(--text-muted);
+font-size:1.1rem;
+padding:.4rem;
+}
+
+.login-btn{
+width:100%;
+justify-content:center;
+padding:.8rem;
+margin-top:.5rem;
+}
+
+.login-error{
+display:none;
+background:rgba(239,68,68,.15);
+border:1px solid rgba(239,68,68,.4);
+color:#fca5a5;
+padding:.7rem;
+border-radius:.5rem;
+margin-bottom:1rem;
+text-align:center;
+}
+
+/* ================= APP ================= */
+
+#app{
+display:none;
+min-height:100vh;
+}
+
+header{
+background:var(--bg-card);
+padding:1rem 1.5rem;
+display:flex;
+justify-content:space-between;
+align-items:center;
+gap:1rem;
+border-bottom:1px solid var(--border);
+}
+
+.brand{
+display:flex;
+align-items:center;
+gap:.75rem;
+font-size:1.25rem;
+font-weight:bold;
+color:var(--primary);
+}
+
+.user-panel{
+display:flex;
+align-items:center;
+gap:.7rem;
+}
+
+#userEmail{
+color:var(--text-muted);
+font-size:.85rem;
+max-width:240px;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
+}
+
+nav{
+background:#111827;
+display:flex;
+overflow-x:auto;
+border-bottom:1px solid var(--border);
+}
+
+.nav-btn{
+padding:.75rem 1.15rem;
+background:none;
+border:none;
+color:var(--text-muted);
+display:flex;
+align-items:center;
+gap:.5rem;
+white-space:nowrap;
+transition:.2s;
+}
+
+.nav-btn:hover,
+.nav-btn.active{
+color:var(--primary);
+border-bottom:2px solid var(--primary);
+background:rgba(37,99,235,.1);
+}
+
+main{
+width:100%;
+max-width:1200px;
+margin:auto;
+padding:1.5rem;
+}
+
+.view-section{
+display:none;
+}
+
+.view-section.active{
+display:block;
+}
+
+.stats-grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+gap:1rem;
+margin-bottom:1.5rem;
+}
+
+.stat-card{
+background:var(--bg-card);
+padding:1.25rem;
+border-radius:.6rem;
+border:1px solid var(--border);
+}
+
+.stat-card .title{
+font-size:.875rem;
+color:var(--text-muted);
+}
+
+.stat-card .value{
+font-size:1.8rem;
+font-weight:bold;
+margin-top:.5rem;
+}
+
+.controls{
+display:flex;
+gap:.7rem;
+margin-bottom:1rem;
+flex-wrap:wrap;
+}
+
+input,
+select,
+textarea{
+background:var(--bg-input);
+border:1px solid var(--border);
+color:var(--text-main);
+padding:.65rem .8rem;
+border-radius:.4rem;
+outline:none;
+width:100%;
+}
+
+.controls input{
+flex:1;
+min-width:180px;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+border-color:var(--primary);
+}
+
+.btn{
+background:var(--primary);
+color:white;
+border:none;
+padding:.6rem 1rem;
+border-radius:.4rem;
+display:inline-flex;
+align-items:center;
+justify-content:center;
+gap:.5rem;
+font-weight:500;
+}
+
+.btn:hover{
+background:var(--primary-dark);
+}
+
+.btn:disabled{
+opacity:.6;
+cursor:not-allowed;
+}
+
+.btn-danger{
+background:var(--danger);
+}
+
+.btn-danger:hover{
+background:#dc2626;
+}
+
+.btn-warning{
+background:var(--warning);
+color:#111827;
+}
+
+.btn-secondary{
+background:var(--secondary);
+}
+
+.btn-success{
+background:var(--success);
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:var(--bg-card);
+border:1px solid var(--border);
+border-radius:.5rem;
+overflow:hidden;
+}
+
+th,
+td{
+padding:.75rem 1rem;
+text-align:right;
+border-bottom:1px solid var(--border);
+}
+
+th{
+background:#0f172a;
+color:var(--text-muted);
+}
+
+tr:last-child td{
+border-bottom:none;
+}
+
+/* ================= MODAL ================= */
+
+.modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.72);
+display:none;
+justify-content:center;
+align-items:center;
+padding:1rem;
+z-index:1000;
+}
+
+.modal.show{
+display:flex;
+}
+
+.modal-content{
+background:var(--bg-card);
+padding:1.5rem;
+border-radius:.7rem;
+width:100%;
+max-width:500px;
+max-height:90vh;
+overflow:auto;
+border:1px solid var(--border);
+}
+
+.modal-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:1rem;
+}
+
+.modal-close{
+background:none;
+border:none;
+color:var(--text-main);
+font-size:1.6rem;
+}
+
+.form-group{
+margin-bottom:1rem;
+display:flex;
+flex-direction:column;
+gap:.35rem;
+}
+
+.form-actions{
+display:flex;
+gap:.5rem;
+margin-top:1rem;
+}
+
+/* ================= STATUS ================= */
+
+.status{
+padding:.25rem .55rem;
+border-radius:.3rem;
+font-size:.75rem;
+display:inline-block;
+white-space:nowrap;
+}
+
+.status-due{
+background:rgba(239,68,68,.2);
+color:#fca5a5;
+}
+
+.status-soon{
+background:rgba(245,158,11,.2);
+color:#fde047;
+}
+
+.status-good{
+background:rgba(16,185,129,.2);
+color:#6ee7b7;
+}
+
+.status-none{
+background:rgba(148,163,184,.2);
+color:#cbd5e1;
+}
+
+/* ================= EQUIPMENT ================= */
+
+.worker-card{
+background:var(--bg-card);
+border:1px solid var(--border);
+border-radius:.6rem;
+padding:1rem;
+margin-bottom:1rem;
+}
+
+.worker-card-header{
+margin-bottom:.6rem;
+}
+
+.worker-card-header h4{
+color:var(--primary);
+margin-bottom:.2rem;
+}
+
+.equipment-row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+gap:1rem;
+border-bottom:1px solid var(--border);
+padding:.65rem 0;
+}
+
+.equipment-row:last-child{
+border-bottom:none;
+}
+
+.equipment-info{
+min-width:0;
+}
+
+.equipment-date{
+font-size:.78rem;
+color:var(--text-muted);
+margin-top:.2rem;
+}
+
+.empty{
+text-align:center;
+padding:2rem;
+color:var(--text-muted);
+}
+
+/* ================= TOAST ================= */
+
+#toast{
+position:fixed;
+bottom:1rem;
+left:1rem;
+right:1rem;
+max-width:420px;
+margin:auto;
+background:var(--bg-card);
+border:1px solid var(--border);
+padding:.8rem 1rem;
+border-radius:.5rem;
+display:none;
+z-index:2000;
+text-align:center;
+}
+
+#toast.show{
+display:block;
+}
+
+/* ================= INSTALL ================= */
+
+.install-box{
+position:fixed;
+bottom:1rem;
+right:1rem;
+z-index:1500;
+}
+
+@media(max-width:700px){
+
+header{
+padding:.8rem 1rem;
+}
+
+#userEmail{
+display:none;
+}
+
+main{
+padding:1rem;
+}
+
+th,
+td{
+padding:.6rem;
+font-size:.82rem;
+}
+
+.btn{
+padding:.55rem .75rem;
+}
+
+.equipment-row{
+align-items:flex-start;
+}
+
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- =====================================================
+LOGIN
+===================================================== -->
+
+<div id="loginScreen">
+
+<div class="login-card">
+
+<div class="login-logo">
+<i class="fa-solid fa-boxes-stacked"></i>
+</div>
+
+<div class="login-title">
+Stock Pro
+</div>
+
+<div class="login-subtitle">
+إدارة المخزن والتجهيزات
+</div>
+
+<div id="loginError" class="login-error"></div>
+
+<form id="loginForm">
+
+<div class="login-group">
+
+<label for="loginEmail">
+البريد الإلكتروني
+</label>
+
+<input
+type="email"
+id="loginEmail"
+autocomplete="email"
+placeholder="example@email.com"
+required
+>
+
+</div>
+
+<div class="login-group">
+
+<label for="loginPassword">
+كلمة السر
+</label>
+
+<div class="password-wrap">
+
+<input
+type="password"
+id="loginPassword"
+autocomplete="current-password"
+placeholder="كلمة السر"
+required
+>
+
+<button
+type="button"
+class="password-toggle"
+id="passwordToggle"
+title="إظهار كلمة السر"
+>
+<i class="fa-solid fa-eye"></i>
+</button>
+
+</div>
+
+</div>
+
+<button
+type="submit"
+class="btn login-btn"
+id="loginBtn"
+>
+<i class="fa-solid fa-right-to-bracket"></i>
+دخول إلى التطبيق
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+
+<!-- =====================================================
+APP
+===================================================== -->
+
+<div id="app">
+
+<header>
+
+<div class="brand">
+<i class="fa-solid fa-boxes-stacked"></i>
+Stock Pro
+</div>
+
+<div class="user-panel">
+
+<span id="userEmail"></span>
+
+<button
+class="btn btn-secondary"
+onclick="logout()"
+title="تسجيل الخروج"
+>
+<i class="fa-solid fa-right-from-bracket"></i>
+</button>
+
+</div>
+
+</header>
+
+
+<nav>
+
+<button
+class="nav-btn active"
+onclick="switchTab('stock')"
+>
+<i class="fa-solid fa-box"></i>
+المخزون
+</button>
+
+<button
+class="nav-btn"
+onclick="switchTab('movements')"
+>
+<i class="fa-solid fa-right-left"></i>
+الحركات
+</button>
+
+<button
+class="nav-btn"
+onclick="switchTab('workers')"
+>
+<i class="fa-solid fa-users"></i>
+العمال
+</button>
+
+<button
+class="nav-btn"
+onclick="switchTab('equipment')"
+>
+<i class="fa-solid fa-shirt"></i>
+التجهيزات
+</button>
+
+<button
+class="nav-btn"
+onclick="switchTab('due')"
+>
+<i class="fa-solid fa-clock-rotate-left"></i>
+الاستحقاقات
+</button>
+
+</nav>
+
+
+<main>
+
+<!-- =====================================================
+STOCK
+===================================================== -->
+
+<section
+id="stockView"
+class="view-section active"
+>
+
+<div class="stats-grid">
+
+<div class="stat-card">
+<div class="title">إجمالي المنتجات</div>
+<div class="value" id="productsNumber">0</div>
+</div>
+
+<div class="stat-card">
+<div class="title">دخول اليوم</div>
+<div class="value" id="entryToday">0</div>
+</div>
+
+<div class="stat-card">
+<div class="title">خروج اليوم</div>
+<div class="value" id="exitToday">0</div>
+</div>
+
+</div>
+
+
+<div class="controls">
+
+<input
+type="text"
+id="stockSearch"
+placeholder="بحث عن منتج..."
+>
+
+<button
+class="btn"
+onclick="openProductModal()"
+>
+<i class="fa-solid fa-plus"></i>
+منتج جديد
+</button>
+
+<button
+class="btn btn-warning"
+onclick="openMovementModal()"
+>
+<i class="fa-solid fa-right-left"></i>
+تسجيل حركة
+</button>
+
+</div>
+
+
+<table>
+
+<thead>
+
+<tr>
+<th>الرمز</th>
+<th>الاسم</th>
+<th>الفئة</th>
+<th>الكمية</th>
+<th>إجراءات</th>
+</tr>
+
+</thead>
+
+<tbody id="productsList"></tbody>
+
+</table>
+
+</section>
+
+
+<!-- =====================================================
+MOVEMENTS
+===================================================== -->
+
+<section
+id="movementsView"
+class="view-section"
+>
+
+<div class="controls">
+
+<input
+type="text"
+id="movementSearch"
+placeholder="بحث بالحركات..."
+>
+
+</div>
+
+<table>
+
+<thead>
+
+<tr>
+<th>التاريخ</th>
+<th>النوع</th>
+<th>المنتج</th>
+<th>الكمية</th>
+<th>الملاحظة</th>
+</tr>
+
+</thead>
+
+<tbody id="movementsList"></tbody>
+
+</table>
+
+</section>
+
+
+<!-- =====================================================
+WORKERS
+===================================================== -->
+
+<section
+id="workersView"
+class="view-section"
+>
+
+<div class="controls">
+
+<input
+type="text"
+id="workerSearch"
+placeholder="بحث عن عامل..."
+>
+
+<button
+class="btn"
+onclick="openWorkerModal()"
+>
+<i class="fa-solid fa-user-plus"></i>
+عامل جديد
+</button>
+
+</div>
+
+<table>
+
+<thead>
+
+<tr>
+<th>رقم التسجيل</th>
+<th>الاسم</th>
+<th>المهنة</th>
+<th>الحالة</th>
+<th>إجراءات</th>
+</tr>
+
+</thead>
+
+<tbody id="workersList"></tbody>
+
+</table>
+
+</section>
+
+
+<!-- =====================================================
+EQUIPMENT
+===================================================== -->
+
+<section
+id="equipmentView"
+class="view-section"
+>
+
+<div class="controls">
+
+<input
+type="text"
+id="equipmentSearch"
+placeholder="بحث عن عامل..."
+>
+
+<button
+class="btn"
+onclick="openEquipment()"
+>
+<i class="fa-solid fa-hand-holding"></i>
+تسليم تجهيز
+</button>
+
+</div>
+
+<div id="equipmentList"></div>
+
+</section>
+
+
+<!-- =====================================================
+DUE
+===================================================== -->
+
+<section
+id="dueView"
+class="view-section"
+>
+
+<div class="stats-grid">
+
+<div class="stat-card">
+
+<div class="title">
+تجهيزات مستحقة اليوم أو سابقة
+</div>
+
+<div
+class="value"
+id="dueToday"
+>
+0
+</div>
+
+</div>
+
+</div>
+
+
+<div class="controls">
+
+<input
+type="text"
+id="dueSearch"
+placeholder="تصفية باسم العامل أو الرقم..."
+>
+
+</div>
+
+<div id="dueList"></div>
+
+</section>
+
+</main>
+
+</div>
+
+
+<!-- =====================================================
+PRODUCT MODAL
+===================================================== -->
+
+<div
+class="modal"
+id="productModal"
+>
+
+<div class="modal-content">
+
+<div class="modal-header">
+
+<h3 id="productModalTitle">
+منتج جديد
+</h3>
+
+<button
+class="modal-close"
+onclick="closeProductModal()"
+>
+&times;
+</button>
+
+</div>
+
+<form
+id="productForm"
+onsubmit="saveProduct(event)"
+>
+
+<input
+type="hidden"
+id="productId"
+>
+
+<div class="form-group">
+
+<label>
+الرمز
+</label>
+
+<input
+type="text"
+id="productCode"
+required
+>
+
+</div>
+
+<div class="form-group">
+
+<label>
+الاسم
+</label>
+
+<input
+type="text"
+id="productName"
+required
+>
+
+</div>
+
+<div class="form-group">
+
+<label>
+الفئة
+</label>
+
+<input
+type="text"
+id="productCategory"
+>
+
+</div>
+
+<div class="form-group">
+
+<label>
+الكمية
+</label>
+
+<input
+type="number"
+id="productQty"
+min="0"
+value="0"
+required
+>
+
+</div>
+
+<div class="form-actions">
+
+<button
+class="btn"
+type="submit"
+>
+حفظ
+</button>
+
+<button
+type="button"
+class="btn btn-secondary"
+onclick="closeProductModal()"
+>
+إلغاء
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+
+<!-- =====================================================
+MOVEMENT MODAL
+===================================================== -->
+
+<div
+class="modal"
+id="movementModal"
+>
+
+<div class="modal-content">
+
+<div class="modal-header">
+
+<h3>
+تسجيل حركة مخزون
+</h3>
+
+<button
+class="modal-close"
+onclick="closeMovementModal()"
+>
+&times;
+</button>
+
+</div>
+
+<form
+id="movementForm"
+onsubmit="saveMovement(event)"
+>
+
+<div class="form-group">
+
+<label>
+النوع
+</label>
+
+<select id="movementType">
+
+<option value="entry">
+دخول (+)
+</option>
+
+<option value="exit">
+خروج (-)
+</option>
+
+</select>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+المنتج
+</label>
+
+<select
+id="movementProduct"
+required
+></select>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+الكمية
+</label>
+
+<input
+type="number"
+id="movementQty"
+min="1"
+value="1"
+required
+>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+ملاحظات / رقم السند
+</label>
+
+<input
+type="text"
+id="movementNote"
+>
+
+</div>
+
+
+<div class="form-actions">
+
+<button
+class="btn"
+type="submit"
+>
+تسجيل
+</button>
+
+<button
+type="button"
+class="btn btn-secondary"
+onclick="closeMovementModal()"
+>
+إلغاء
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+
+<!-- =====================================================
+WORKER MODAL
+===================================================== -->
+
+<div
+class="modal"
+id="workerModal"
+>
+
+<div class="modal-content">
+
+<div class="modal-header">
+
+<h3>
+بيانات العامل
+</h3>
+
+<button
+class="modal-close"
+onclick="closeWorkerModal()"
+>
+&times;
+</button>
+
+</div>
+
+<form
+id="workerForm"
+onsubmit="saveWorker(event)"
+>
+
+<div class="form-group">
+
+<label>
+رقم التسجيل
+</label>
+
+<input
+type="text"
+id="workerMatricule"
+required
+>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+الاسم الكامل
+</label>
+
+<input
+type="text"
+id="workerName"
+required
+>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+الوظيفة / القسم
+</label>
+
+<input
+type="text"
+id="workerRole"
+>
+
+</div>
+
+
+<div class="form-actions">
+
+<button
+class="btn"
+type="submit"
+>
+حفظ
+</button>
+
+<button
+type="button"
+class="btn btn-secondary"
+onclick="closeWorkerModal()"
+>
+إلغاء
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+
+<!-- =====================================================
+EQUIPMENT MODAL
+===================================================== -->
+
+<div
+class="modal"
+id="equipmentModal"
+>
+
+<div class="modal-content">
+
+<div class="modal-header">
+
+<h3>
+تسليم تجهيزات للحماية
+</h3>
+
+<button
+class="modal-close"
+onclick="closeEquipment()"
+>
+&times;
+</button>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+العامل
+</label>
+
+<select id="equipmentWorker"></select>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+نوع التجهيز
+</label>
+
+<select id="equipmentType">
+
+<option value="shoes">
+حذاء حماية
+</option>
+
+<option value="bleu">
+بدلة عمل
+</option>
+
+<option value="glasses">
+نظارات حماية
+</option>
+
+<option value="gants">
+قفازات
+</option>
+
+<option value="vest_soudeur">
+سترة لحام
+</option>
+
+</select>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+تاريخ التسليم
+</label>
+
+<input
+type="date"
+id="equipmentDate"
+>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+الكمية
+</label>
+
+<input
+type="number"
+id="equipmentQty"
+min="1"
+value="1"
+>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+رقم وصل التسليم
+</label>
+
+<input
+type="text"
+id="equipmentBon"
+>
+
+</div>
+
+
+<div class="form-group">
+
+<label>
+ملاحظات
+</label>
+
+<input
+type="text"
+id="equipmentNote"
+>
+
+</div>
+
+
+<div class="form-actions">
+
+<button
+class="btn"
+onclick="saveEquipment()"
+>
+تسجيل التسليم
+</button>
+
+<button
+class="btn btn-secondary"
+onclick="closeEquipment()"
+>
+إلغاء
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div id="toast"></div>
+
+
+<!-- =====================================================
+JAVASCRIPT
+===================================================== -->
+
+<script>
+
+/* =====================================================
+SUPABASE CONFIG
+===================================================== */
+
+const SUPABASE_URL =
+"https://mpanymikmqajpppipmxy.supabase.co";
+
+const SUPABASE_ANON_KEY =
+"sb_publishable_gFcCXJ4jzWl4P8CDBi-uhQ_Gkr1EHa4";
+
+const db =
+supabase.createClient(
+SUPABASE_URL,
+SUPABASE_ANON_KEY
+);
+
+
+/* =====================================================
+DATA
+===================================================== */
+
+let products=[];
+let workers=[];
+let equipment=[];
+let movements=[];
+
+let currentUser=null;
+
+let deferredInstallPrompt=null;
+
+
+/* =====================================================
+TRANSLATIONS
+===================================================== */
+
+const translations={
+
+ar:{
+selectWorker:"اختر العامل...",
+shoes:"حذاء حماية",
+bleu:"بدلة عمل",
+glasses:"نظارات حماية",
+gants:"قفازات",
+vest_soudeur:"سترة لحام"
+}
+
+};
+
+let currentLanguage="ar";
+
+
+function t(key){
+
+return translations[currentLanguage]?.[key] || key;
+
+}
+
+
+/* =====================================================
+UTILITIES
+===================================================== */
+
+function todayKey(){
+
+const d=new Date();
+
+const y=d.getFullYear();
+
+const m=String(d.getMonth()+1).padStart(2,"0");
+
+const day=String(d.getDate()).padStart(2,"0");
+
+return `${y}-${m}-${day}`;
+
+}
+
+
+function formatDate(date){
+
+if(!date) return "-";
+
+const d=new Date(date+"T00:00:00");
+
+if(Number.isNaN(d.getTime())) return "-";
+
+return d.toLocaleDateString("ar-DZ");
+
+}
+
+
+function addMonths(dateStr,months){
+
+const d=new Date(dateStr+"T00:00:00");
+
+const originalDay=d.getDate();
+
+d.setMonth(d.getMonth()+months);
+
+if(d.getDate()!==originalDay){
+
+d.setDate(0);
+
+}
+
+return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+}
+
+
+function addDays(dateStr,days){
+
+const d=new Date(dateStr+"T00:00:00");
+
+d.setDate(d.getDate()+days);
+
+return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+}
+
+
+function safe(str){
+
+if(str===null || str===undefined) return "";
+
+return String(str)
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#039;");
+
+}
+
+
+function toast(message){
+
+const el=document.getElementById("toast");
+
+if(!el) return;
+
+el.textContent=message;
+
+el.classList.add("show");
+
+clearTimeout(window.toastTimer);
+
+window.toastTimer=setTimeout(()=>{
+
+el.classList.remove("show");
+
+},3000);
+
+}
+
+
+/* =====================================================
+NAVIGATION
+===================================================== */
+
+function switchTab(tabId){
+
+document
+.querySelectorAll(".nav-btn")
+.forEach(btn=>btn.classList.remove("active"));
+
+document
+.querySelectorAll(".view-section")
+.forEach(sec=>sec.classList.remove("active"));
+
+const targetBtn=
+document.querySelector(
+`[onclick="switchTab('${tabId}')"]`
+);
+
+const targetSec=
+document.getElementById(tabId+"View");
+
+if(targetBtn)
+targetBtn.classList.add("active");
+
+if(targetSec)
+targetSec.classList.add("active");
+
+}
+
+
+/* =====================================================
+AUTH
+===================================================== */
+
+async function checkSession(){
+
+try{
+
+const {
+data,
+error
+}=await db.auth.getSession();
+
+if(error){
+
+console.error(error);
+
+showLogin();
+
+return;
+
+}
+
+if(data.session){
+
+currentUser=data.session.user;
+
+showApp();
+
+await loadAll();
+
+}else{
+
+showLogin();
+
+}
+
+}catch(error){
+
+console.error(error);
+
+showLogin();
+
+}
+
+}
+
+
+function showLogin(){
+
+document.getElementById("loginScreen").style.display="flex";
+
+document.getElementById("app").style.display="none";
+
+}
+
+
+function showApp(){
+
+document.getElementById("loginScreen").style.display="none";
+
+document.getElementById("app").style.display="block";
+
+document.getElementById("userEmail").textContent=
+currentUser?.email || "";
+
+}
+
+
+function showLoginError(message){
+
+const box=
+document.getElementById("loginError");
+
+box.textContent=message;
+
+box.style.display="block";
+
+}
+
+
+async function login(){
+
+const email=
+document.getElementById("loginEmail")
+.value.trim();
+
+const password=
+document.getElementById("loginPassword")
+.value;
+
+const btn=
+document.getElementById("loginBtn");
+
+document.getElementById("loginError")
+.style.display="none";
+
+if(!email || !password){
+
+showLoginError(
+"أدخل البريد الإلكتروني وكلمة السر."
+);
+
+return;
+
+}
+
+btn.disabled=true;
+
+btn.innerHTML=
+'<i class="fa-solid fa-spinner fa-spin"></i> جاري الدخول...';
+
+try{
+
+const {
+data,
+error
+}=
+await db.auth.signInWithPassword({
+
+email:email,
+password:password
+
+});
+
+if(error){
+
+console.error(error);
+
+showLoginError(
+"فشل تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة السر."
+);
+
+return;
+
+}
+
+currentUser=data.user;
+
+showApp();
+
+await loadAll();
+
+toast("تم تسجيل الدخول ✅");
+
+}catch(error){
+
+console.error(error);
+
+showLoginError(
+"حدث خطأ أثناء تسجيل الدخول."
+);
+
+}finally{
+
+btn.disabled=false;
+
+btn.innerHTML=
+'<i class="fa-solid fa-right-to-bracket"></i> دخول إلى التطبيق';
+
+}
+
+}
+
+
+async function logout(){
+
+if(!confirm("هل تريد تسجيل الخروج؟"))
+return;
+
+try{
+
+await db.auth.signOut();
+
+}catch(error){
+
+console.error(error);
+
+}
+
+currentUser=null;
+
+products=[];
+workers=[];
+equipment=[];
+movements=[];
+
+showLogin();
+
+}
+
+
+/* =====================================================
+AUTH STATE
+===================================================== */
+
+db.auth.onAuthStateChange(
+(event,session)=>{
+
+if(session){
+
+currentUser=session.user;
+
+showApp();
+
+}else{
+
+currentUser=null;
+
+products=[];
+workers=[];
+equipment=[];
+movements=[];
+
+showLogin();
+
+}
+
+}
+);
+
+
+/* =====================================================
+LOAD ALL
+===================================================== */
+
+async function loadAll(){
+
+if(!currentUser)
+return;
+
+await Promise.all([
+
+loadProducts(),
+
+loadWorkers(),
+
+loadEquipment(),
+
+loadMovements()
+
+]);
+
+renderProducts();
+
+renderWorkers();
+
+renderEquipment();
+
+renderDue();
+
+renderMovements();
+
+statistics();
+
+}
+
+
+/* =====================================================
+PRODUCTS
+===================================================== */
+
+async function loadProducts(){
+
+if(!currentUser)
+return;
+
+const {
+data,
+error
+}=
+await db
+.from("products")
+.select("*")
+.eq("user_id",currentUser.id)
+.order("created_at",{ascending:false});
+
+if(error){
+
+console.error("Products:",error);
+
+toast("خطأ في تحميل المنتجات ❌");
+
+products=[];
+
+return;
+
+}
+
+products=data || [];
+
+renderProducts();
+
+}
+
+
+function renderProducts(){
+
+const tbody=
+document.getElementById("productsList");
+
+if(!tbody)
+return;
+
+const search=
+(document.getElementById("stockSearch")?.value || "")
+.toLowerCase()
+.trim();
+
+tbody.innerHTML="";
+
+const filtered=
+products.filter(p=>{
+
+const name=String(p.name||"").toLowerCase();
+
+const code=String(p.code||"").toLowerCase();
+
+return name.includes(search) ||
+code.includes(search);
+
+});
+
+if(!filtered.length){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" class="empty">
+لا توجد منتجات
+</td>
+</tr>`;
+
+return;
+
+}
+
+filtered.forEach(p=>{
+
+const tr=document.createElement("tr");
+
+tr.innerHTML=`
+
+<td>${safe(p.code)}</td>
+
+<td>${safe(p.name)}</td>
+
+<td>${safe(p.category)}</td>
+
+<td>
+<strong>${Number(p.quantity)||0}</strong>
+</td>
+
+<td>
+
+<button
+class="btn btn-secondary"
+onclick="editProduct('${p.id}')"
+title="تعديل"
+>
+<i class="fa-solid fa-pen"></i>
+</button>
+
+<button
+class="btn btn-danger"
+onclick="deleteProduct('${p.id}')"
+title="حذف"
+>
+<i class="fa-solid fa-trash"></i>
+</button>
+
+</td>
+
+`;
+
+tbody.appendChild(tr);
+
+});
+
+}
+
+
+function openProductModal(id=null){
+
+const form=
+document.getElementById("productForm");
+
+const title=
+document.getElementById("productModalTitle");
+
+form.reset();
+
+document.getElementById("productId").value="";
+
+if(id){
+
+const p=
+products.find(item=>item.id===id);
+
+if(!p){
+
+toast("المنتج غير موجود ❌");
+
+return;
+
+}
+
+document.getElementById("productId").value=p.id;
+
+document.getElementById("productCode").value=p.code || "";
+
+document.getElementById("productName").value=p.name || "";
+
+document.getElementById("productCategory").value=p.category || "";
+
+document.getElementById("productQty").value=
+Number(p.quantity)||0;
+
+title.textContent="تعديل المنتج";
+
+}else{
+
+document.getElementById("productQty").value=0;
+
+title.textContent="منتج جديد";
+
+}
+
+document
+.getElementById("productModal")
+.classList.add("show");
+
+}
+
+
+function closeProductModal(){
+
+document
+.getElementById("productModal")
+.classList.remove("show");
+
+}
+
+
+function editProduct(id){
+
+openProductModal(id);
+
+}
+
+
+async function saveProduct(e){
+
+e.preventDefault();
+
+if(!currentUser){
+
+toast("يجب تسجيل الدخول ❌");
+
+return;
+
+}
+
+const id=
+document.getElementById("productId").value;
+
+const code=
+document.getElementById("productCode").value.trim();
+
+const name=
+document.getElementById("productName").value.trim();
+
+const category=
+document.getElementById("productCategory").value.trim();
+
+const quantity=
+Math.max(
+0,
+Number(document.getElementById("productQty").value)||0
+);
+
+if(!code || !name){
+
+toast("أدخل الرمز والاسم ❌");
+
+return;
+
+}
+
+const obj={
+
+user_id:currentUser.id,
+
+code:code,
+
+name:name,
+
+category:category,
+
+quantity:quantity
+
+};
+
+try{
+
+let result;
+
+if(id){
+
+result=
+await db
+.from("products")
+.update(obj)
+.eq("id",id)
+.eq("user_id",currentUser.id);
+
+}else{
+
+result=
+await db
+.from("products")
+.insert(obj);
+
+}
+
+if(result.error){
+
+console.error(result.error);
+
+toast(
+"تعذر حفظ المنتج ❌ " +
+result.error.message
+);
+
+return;
+
+}
+
+closeProductModal();
+
+await loadProducts();
+
+statistics();
+
+toast(
+id
+?"تم تعديل المنتج ✅"
+:"تم إضافة المنتج ✅"
+);
+
+}catch(error){
+
+console.error(error);
+
+toast("حدث خطأ أثناء حفظ المنتج ❌");
+
+}
+
+}
+
+
+async function deleteProduct(id){
+
+if(!currentUser)
+return;
+
+const p=
+products.find(item=>item.id===id);
+
+if(!p)
+return;
+
+if(!confirm(
+"هل أنت متأكد من حذف المنتج؟\n\n"+
+p.name
+))
+return;
+
+try{
+
+const {
+error
+}=
+await db
+.from("products")
+.delete()
+.eq("id",id)
+.eq("user_id",currentUser.id);
+
+if(error){
+
+console.error(error);
+
+toast("تعذر حذف المنتج ❌");
+
+return;
+
+}
+
+await loadProducts();
+
+statistics();
+
+toast("تم حذف المنتج ✅");
+
+}catch(error){
+
+console.error(error);
+
+toast("حدث خطأ أثناء الحذف ❌");
+
+}
+
+}
+
+
+/* =====================================================
+MOVEMENTS
+===================================================== */
+
+async function loadMovements(){
+
+if(!currentUser)
+return;
+
+const {
+data,
+error
+}=
+await db
+.from("movements")
+.select("*")
+.eq("user_id",currentUser.id)
+.order("created_at",{ascending:false});
+
+if(error){
+
+console.error("Movements:",error);
+
+movements=[];
+
+return;
+
+}
+
+movements=data || [];
+
+renderMovements();
+
+}
+
+
+function renderMovements(){
+
+const tbody=
+document.getElementById("movementsList");
+
+if(!tbody)
+return;
+
+const search=
+(document.getElementById("movementSearch")?.value || "")
+.toLowerCase()
+.trim();
+
+tbody.innerHTML="";
+
+const filtered=
+movements.filter(m=>{
+
+const text=[
+m.product_name,
+m.note,
+m.type
+]
+.join(" ")
+.toLowerCase();
+
+return text.includes(search);
+
+});
+
+if(!filtered.length){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" class="empty">
+لا توجد حركات
+</td>
+</tr>`;
+
+return;
+
+}
+
+filtered.forEach(m=>{
+
+const date=
+m.created_at
+?m.created_at.substring(0,10)
+:"";
+
+const isEntry=m.type==="entry";
+
+const tr=document.createElement("tr");
+
+tr.innerHTML=`
+
+<td>${formatDate(date)}</td>
+
+<td>
+
+<span class="status ${
+isEntry
+?"status-good"
+:"status-due"
+}">
+
+${isEntry?"دخول":"خروج"}
+
+</span>
+
+</td>
+
+<td>${safe(m.product_name)}</td>
+
+<td>${Number(m.quantity)||0}</td>
+
+<td>${safe(m.note)}</td>
+
+`;
+
+tbody.appendChild(tr);
+
+});
+
+}
+
+
+function openMovementModal(){
+
+if(!currentUser)
+return;
+
+const select=
+document.getElementById("movementProduct");
+
+select.innerHTML="";
+
+if(!products.length){
+
+select.innerHTML=
+'<option value="">لا توجد منتجات</option>';
+
+toast("أضف منتجًا أولًا ❌");
+
+}else{
+
+products.forEach(p=>{
+
+const option=
+document.createElement("option");
+
+option.value=p.id;
+
+option.textContent=
+`${p.name} (${Number(p.quantity)||0})`;
+
+select.appendChild(option);
+
+});
+
+}
+
+document.getElementById("movementQty").value=1;
+
+document.getElementById("movementNote").value="";
+
+document
+.getElementById("movementModal")
+.classList.add("show");
+
+}
+
+
+function closeMovementModal(){
+
+document
+.getElementById("movementModal")
+.classList.remove("show");
+
+}
+
+
+async function saveMovement(e){
+
+e.preventDefault();
+
+if(!currentUser){
+
+toast("يجب تسجيل الدخول ❌");
+
+return;
+
+}
+
+const pId=
+document.getElementById("movementProduct").value;
+
+const type=
+document.getElementById("movementType").value;
+
+const qty=
+Number(document.getElementById("movementQty").value);
+
+const note=
+document.getElementById("movementNote").value.trim();
+
+if(!pId || !qty || qty<1){
+
+toast("أدخل بيانات الحركة بشكل صحيح ❌");
+
+return;
+
+}
+
+const prod=
+products.find(p=>p.id===pId);
+
+if(!prod){
+
+toast("المنتج غير موجود ❌");
+
+return;
+
+}
+
+const currentQty=
+Number(prod.quantity)||0;
+
+if(type==="exit" && qty>currentQty){
+
+toast(
+`الكمية غير كافية. المتوفر: ${currentQty} ❌`
+);
+
+return;
+
+}
+
+const newQty=
+type==="entry"
+?currentQty+qty
+:currentQty-qty;
+
+try{
+
+const movementResult=
+await db
+.from("movements")
+.insert({
+
+user_id:currentUser.id,
+product_id:pId,
+product_name:prod.name,
+type:type,
+quantity:qty,
+note:note
+
+});
+
+if(movementResult.error){
+
+console.error(movementResult.error);
+
+toast("تعذر تسجيل الحركة ❌");
+
+return;
+
+}
+
+const productResult=
+await db
+.from("products")
+.update({
+quantity:newQty
+})
+.eq("id",pId)
+.eq("user_id",currentUser.id);
+
+if(productResult.error){
+
+console.error(productResult.error);
+
+toast(
+"تم تسجيل الحركة لكن تعذر تحديث الكمية ❌"
+);
+
+await loadAll();
+
+return;
+
+}
+
+closeMovementModal();
+
+await loadProducts();
+
+await loadMovements();
+
+statistics();
+
+toast("تم تسجيل الحركة ✅");
+
+}catch(error){
+
+console.error(error);
+
+toast("حدث خطأ أثناء تسجيل الحركة ❌");
+
+}
+
+}
+
+
+/* =====================================================
+WORKERS
+===================================================== */
+
+async function loadWorkers(){
+
+if(!currentUser)
+return;
+
+const {
+data,
+error
+}=
+await db
+.from("workers")
+.select("*")
+.eq("user_id",currentUser.id)
+.order("name");
+
+if(error){
+
+console.error("Workers:",error);
+
+workers=[];
+
+return;
+
+}
+
+workers=data || [];
+
+renderWorkers();
+
+}
+
+
+function renderWorkers(){
+
+const tbody=
+document.getElementById("workersList");
+
+if(!tbody)
+return;
+
+const search=
+(document.getElementById("workerSearch")?.value || "")
+.toLowerCase()
+.trim();
+
+tbody.innerHTML="";
+
+const filtered=
+workers.filter(w=>{
+
+const name=
+String(w.name||"").toLowerCase();
+
+const matricule=
+String(w.matricule||"").toLowerCase();
+
+const role=
+String(w.role||"").toLowerCase();
+
+return name.includes(search) ||
+matricule.includes(search) ||
+role.includes(search);
+
+});
+
+if(!filtered.length){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" class="empty">
+لا يوجد عمال
+</td>
+</tr>`;
+
+return;
+
+}
+
+filtered.forEach(w=>{
+
+const active=
+w.status==="active" || !w.status;
+
+const tr=document.createElement("tr");
+
+tr.innerHTML=`
+
+<td>${safe(w.matricule)}</td>
+
+<td>${safe(w.name)}</td>
+
+<td>${safe(w.role)}</td>
+
+<td>
+
+<span class="status ${
+active
+?"status-good"
+:"status-none"
+}">
+
+${active?"نشط":"غير نشط"}
+
+</span>
+
+</td>
+
+<td>
+
+<button
+class="btn btn-danger"
+onclick="deleteWorker('${w.id}')"
+>
+<i class="fa-solid fa-trash"></i>
+</button>
+
+</td>
+
+`;
+
+tbody.appendChild(tr);
+
+});
+
+}
+
+
+function openWorkerModal(){
+
+document.getElementById("workerForm").reset();
+
+document
+.getElementById("workerModal")
+.classList.add("show");
+
+}
+
+
+function closeWorkerModal(){
+
+document
+.getElementById("workerModal")
+.classList.remove("show");
+
+}
+
+
+async function saveWorker(e){
+
+e.preventDefault();
+
+if(!currentUser)
+return;
+
+const matricule=
+document.getElementById("workerMatricule")
+.value.trim();
+
+const name=
+document.getElementById("workerName")
+.value.trim();
+
+const role=
+document.getElementById("workerRole")
+.value.trim();
+
+if(!matricule || !name){
+
+toast("أدخل رقم التسجيل والاسم ❌");
+
+return;
+
+}
+
+try{
+
+const {
+error
+}=
+await db
+.from("workers")
+.insert({
+
+user_id:currentUser.id,
+matricule:matricule,
+name:name,
+role:role,
+status:"active"
+
+});
+
+if(error){
+
+console.error(error);
+
+toast(
+"تعذر إضافة العامل ❌"
+);
+
+return;
+
+}
+
+closeWorkerModal();
+
+await loadWorkers();
+
+renderEquipment();
+
+renderDue();
+
+toast("تم إضافة العامل ✅");
+
+}catch(error){
+
+console.error(error);
+
+toast("حدث خطأ أثناء إضافة العامل ❌");
+
+}
+
+}
+
+
+async function deleteWorker(id){
+
+if(!currentUser)
+return;
+
+const w=
+workers.find(item=>item.id===id);
+
+if(!w)
+return;
+
+if(!confirm(
+"هل أنت متأكد من حذف العامل؟\n\n"+
+w.name
+))
+return;
+
+try{
+
+const {
+error
+}=
+await db
+.from("workers")
+.delete()
+.eq("id",id)
+.eq("user_id",currentUser.id);
+
+if(error){
+
+console.error(error);
+
+toast("تعذر حذف العامل ❌");
+
+return;
+
+}
+
+await loadWorkers();
+
+renderWorkers();
+
+renderDue();
+
+renderEquipment();
+
+toast("تم حذف العامل ✅");
+
+}catch(error){
+
+console.error(error);
+
+toast("حدث خطأ أثناء حذف العامل ❌");
+
+}
+
+}
+
+
+/* =====================================================
+EQUIPMENT
+===================================================== */
+
+async function loadEquipment(){
+
+if(!currentUser)
+return;
+
+const {
+data,
+error
+}=
+await db
+.from("equipment")
+.select("*")
+.eq("user_id",currentUser.id);
+
+if(error){
+
+console.error("Equipment:",error);
+
+equipment=[];
+
+return;
+
+}
+
+equipment=data || [];
+
+renderEquipment();
+
+renderDue();
+
+}
+
+
+function openEquipment(){
+
+if(!currentUser)
+return;
+
+const select=
+document.getElementById("equipmentWorker");
+
+select.innerHTML=
+`<option value="">${t("selectWorker")}</option>`;
+
+workers
+.filter(w=>w.status==="active" || !w.status)
+.forEach(w=>{
+
+const opt=
+document.createElement("option");
+
+opt.value=w.matricule;
+
+opt.textContent=
+`${w.name} (${w.matricule})`;
+
+select.appendChild(opt);
+
+});
+
+document.getElementById("equipmentDate")
+.value=todayKey();
+
+document.getElementById("equipmentQty")
+.value=1;
+
+document.getElementById("equipmentBon")
+.value="";
+
+document.getElementById("equipmentNote")
+.value="";
+
+document
+.getElementById("equipmentModal")
+.classList.add("show");
+
+}
+
+
+function closeEquipment(){
+
+document
+.getElementById("equipmentModal")
+.classList.remove("show");
+
+}
+
+
+function getEquipmentInterval(type){
+
+switch(type){
+
+case "shoes":
+return {months:12,days:0};
+
+case "bleu":
+return {months:6,days:0};
+
+case "glasses":
+return {months:6,days:0};
+
+case "gants":
+return {months:0,days:35};
+
+case "vest_soudeur":
+return {months:6,days:0};
+
+default:
+return {months:6,days:0};
+
+}
+
+}
+
+
+function calculateNextDueDate(lastDate,type){
+
+if(!lastDate)
+return null;
+
+const interval=
+getEquipmentInterval(type);
+
+if(interval.months>0)
+return addMonths(
+lastDate,
+interval.months
+);
+
+if(interval.days>0)
+return addDays(
+lastDate,
+interval.days
+);
+
+return null;
+
+}
+
+
+function getDueStatus(nextDueDate){
+
+if(!nextDueDate)
+return "none";
+
+const today=
+new Date(todayKey()+"T00:00:00");
+
+const due=
+new Date(nextDueDate+"T00:00:00");
+
+const diffTime=
+due-today;
+
+const diffDays=
+Math.ceil(
+diffTime/(1000*60*60*24)
+);
+
+if(diffDays<=0)
+return "due";
+
+if(diffDays<=30)
+return "soon";
+
+return "good";
+
+}
+
+
+function getStatusText(status){
+
+switch(status){
+
+case "due":
+return "مستحق";
+
+case "soon":
+return "قريب الاستحقاق";
+
+case "good":
+return "ساري المفعول";
+
+default:
+return "لم يسلم";
+
+}
+
+}
+
+
+function getStatusClass(status){
+
+switch(status){
+
+case "due":
+return "status-due";
+
+case "soon":
+return "status-soon";
+
+case "good":
+return "status-good";
+
+default:
+return "status-none";
+
+}
+
+}
+
+
+async function saveEquipment(){
+
+if(!currentUser)
+return;
+
+const matricule=
+document.getElementById("equipmentWorker").value;
+
+const type=
+document.getElementById("equipmentType").value;
+
+const lastDate=
+document.getElementById("equipmentDate").value;
+
+const qty=
+Number(
+document.getElementById("equipmentQty").value
+)||1;
+
+if(!matricule || !lastDate){
+
+toast(
+"اختر العامل وتاريخ التسليم ❌"
+);
+
+return;
+
+}
+
+const worker=
+workers.find(
+w=>w.matricule===matricule
+);
+
+if(!worker){
+
+toast("العامل غير موجود ❌");
+
+return;
+
+}
+
+const nextDueDate=
+calculateNextDueDate(
+lastDate,
+type
+);
+
+const obj={
+
+user_id:currentUser.id,
+
+worker_matricule:matricule,
+
+worker_name:worker.name,
+
+equipment_type:type,
+
+last_date:lastDate,
+
+next_due_date:nextDueDate,
+
+quantity:qty,
+
+bon:
+document.getElementById("equipmentBon")
+.value.trim(),
+
+note:
+document.getElementById("equipmentNote")
+.value.trim(),
+
+updated_at:
+new Date().toISOString()
+
+};
+
+try{
+
+const {
+error
+}=
+await db
+.from("equipment")
+.upsert(
+obj,
+{
+onConflict:
+"user_id,worker_matricule,equipment_type"
+}
+);
+
+if(error){
+
+console.error(error);
+
+toast(
+"تعذر تسجيل التجهيز ❌\n"+
+error.message
+);
+
+return;
+
+}
+
+await loadEquipment();
+
+closeEquipment();
+
+toast(
+"تم تسجيل تسليم التجهيز ✅"
+);
+
+}catch(error){
+
+console.error(error);
+
+toast(
+"حدث خطأ أثناء تسجيل التجهيز ❌"
+);
+
+}
+
+}
+
+
+/* =====================================================
+RENDER EQUIPMENT
+===================================================== */
+
+function renderEquipment(){
+
+const box=
+document.getElementById("equipmentList");
+
+if(!box)
+return;
+
+const search=
+(document.getElementById("equipmentSearch")?.value || "")
+.toLowerCase()
+.trim();
+
+const activeWorkers=
+workers.filter(w=>{
+
+if(w.status==="inactive")
+return false;
+
+const name=
+String(w.name||"").toLowerCase();
+
+const matricule=
+String(w.matricule||"").toLowerCase();
+
+return name.includes(search) ||
+matricule.includes(search);
+
+});
+
+if(!activeWorkers.length){
+
+box.innerHTML=`
+<div class="empty">
+لا يوجد عمال متطابقون
+</div>`;
+
+return;
+
+}
+
+box.innerHTML="";
+
+const types=[
+"shoes",
+"bleu",
+"glasses",
+"gants",
+"vest_soudeur"
+];
+
+activeWorkers.forEach(w=>{
+
+const card=
+document.createElement("div");
+
+card.className="worker-card";
+
+let itemsHtml="";
+
+types.forEach(type=>{
+
+const eq=
+equipment.find(e=>
+e.worker_matricule===w.matricule &&
+e.equipment_type===type
+);
+
+const status=
+eq
+?getDueStatus(eq.next_due_date)
+:"none";
+
+itemsHtml+=`
+
+<div class="equipment-row">
+
+<div class="equipment-info">
+
+<strong>
+${t(type)}
+</strong>
+
+<div class="equipment-date">
+
+آخر تسليم:
+${formatDate(eq?.last_date)}
+
+<br>
+
+تاريخ الاستحقاق:
+${formatDate(eq?.next_due_date)}
+
+${eq?.quantity
+?`<br>الكمية: ${safe(eq.quantity)}`
+:""}
+
+</div>
+
+</div>
+
+<span class="status ${getStatusClass(status)}">
+
+${getStatusText(status)}
+
+</span>
+
+</div>
+
+`;
+
+});
+
+card.innerHTML=`
+
+<div class="worker-card-header">
+
+<h4>
+${safe(w.name)}
+</h4>
+
+<small>
+Matricule:
+${safe(w.matricule)}
+</small>
+
+</div>
+
+${itemsHtml}
+
+`;
+
+box.appendChild(card);
+
+});
+
+}
+
+
+/* =====================================================
+DUE
+===================================================== */
+
+function renderDue(){
+
+const box=
+document.getElementById("dueList");
+
+if(!box)
+return;
+
+const search=
+(document.getElementById("dueSearch")?.value || "")
+.toLowerCase()
+.trim();
+
+let dueCount=0;
+
+box.innerHTML="";
+
+const types=[
+"shoes",
+"bleu",
+"glasses",
+"gants",
+"vest_soudeur"
+];
+
+workers
+.filter(w=>
+w.status==="active" || !w.status
+)
+.forEach(w=>{
+
+const name=
+String(w.name||"").toLowerCase();
+
+const matricule=
+String(w.matricule||"").toLowerCase();
+
+if(
+search &&
+!name.includes(search) &&
+!matricule.includes(search)
+)
+return;
+
+const dueItems=[];
+
+types.forEach(type=>{
+
+const eq=
+equipment.find(e=>
+e.worker_matricule===w.matricule &&
+e.equipment_type===type
+);
+
+const status=
+eq
+?getDueStatus(eq.next_due_date)
+:"none";
+
+if(
+status==="due" ||
+status==="soon" ||
+status==="none"
+){
+
+if(status==="due")
+dueCount++;
+
+dueItems.push({
+type:type,
+eq:eq,
+status:status
+});
+
+}
+
+});
+
+if(!dueItems.length)
+return;
+
+const card=
+document.createElement("div");
+
+card.className="worker-card";
+
+let itemsHtml="";
+
+dueItems.forEach(item=>{
+
+itemsHtml+=`
+
+<div class="equipment-row">
+
+<div class="equipment-info">
+
+<strong>
+${t(item.type)}
+</strong>
+
+<div class="equipment-date">
+
+الاستحقاق:
+${formatDate(item.eq?.next_due_date)}
+
+</div>
+
+</div>
+
+<span class="status ${getStatusClass(item.status)}">
+
+${getStatusText(item.status)}
+
+</span>
+
+</div>
+
+`;
+
+});
+
+card.innerHTML=`
+
+<div class="worker-card-header">
+
+<h4>
+${safe(w.name)}
+</h4>
+
+<small>
+Matricule:
+${safe(w.matricule)}
+</small>
+
+</div>
+
+${itemsHtml}
+
+`;
+
+box.appendChild(card);
+
+});
+
+document.getElementById("dueToday").textContent=
+dueCount;
+
+if(!box.children.length){
+
+box.innerHTML=`
+<div class="empty">
+لا توجد استحقاقات حالية
+</div>`;
+
+}
+
+}
+
+
+/* =====================================================
+STATISTICS
+===================================================== */
+
+function statistics(){
+
+const productsNumber=
+document.getElementById("productsNumber");
+
+const entryToday=
+document.getElementById("entryToday");
+
+const exitToday=
+document.getElementById("exitToday");
+
+if(productsNumber)
+productsNumber.textContent=
+products.length;
+
+const today=todayKey();
+
+let entries=0;
+
+let exits=0;
+
+movements.forEach(m=>{
+
+const date=
+m.created_at
+?m.created_at.substring(0,10)
+:"";
+
+if(date===today){
+
+if(m.type==="entry")
+entries+=Number(m.quantity)||0;
+
+if(m.type==="exit")
+exits+=Number(m.quantity)||0;
+
+}
+
+});
+
+if(entryToday)
+entryToday.textContent=entries;
+
+if(exitToday)
+exitToday.textContent=exits;
+
+}
+
+
+/* =====================================================
+SEARCH LISTENERS
+===================================================== */
+
+document
+.getElementById("stockSearch")
+?.addEventListener(
+"input",
+renderProducts
+);
+
+document
+.getElementById("workerSearch")
+?.addEventListener(
+"input",
+renderWorkers
+);
+
+document
+.getElementById("equipmentSearch")
+?.addEventListener(
+"input",
+renderEquipment
+);
+
+document
+.getElementById("movementSearch")
+?.addEventListener(
+"input",
+renderMovements
+);
+
+document
+.getElementById("dueSearch")
+?.addEventListener(
+"input",
+renderDue
+);
+
+
+/* =====================================================
+PASSWORD SHOW / HIDE
+===================================================== */
+
+document
+.getElementById("passwordToggle")
+.addEventListener(
+"click",
+function(){
+
+const input=
+document.getElementById("loginPassword");
+
+const icon=
+this.querySelector("i");
+
+if(input.type==="password"){
+
+input.type="text";
+
+icon.className=
+"fa-solid fa-eye-slash";
+
+this.title="إخفاء كلمة السر";
+
+}else{
+
+input.type="password";
+
+icon.className=
+"fa-solid fa-eye";
+
+this.title="إظهار كلمة السر";
+
+}
+
+}
+);
+
+
+/* =====================================================
+LOGIN FORM
+===================================================== */
+
+document
+.getElementById("loginForm")
+.addEventListener(
+"submit",
+function(e){
+
+e.preventDefault();
+
+login();
+
+}
+);
+
+
+/* =====================================================
+MODAL OUTSIDE CLICK
+===================================================== */
+
+document
+.querySelectorAll(".modal")
+.forEach(modal=>{
+
+modal.addEventListener(
+"click",
+function(e){
+
+if(e.target===modal){
+
+modal.classList.remove("show");
+
+}
+
+}
+);
+
+});
+
+
+/* =====================================================
+PWA INSTALL
+===================================================== */
+
+window.addEventListener(
+"beforeinstallprompt",
+function(e){
+
+e.preventDefault();
+
+deferredInstallPrompt=e;
+
+if(!document.getElementById("installBtn")){
+
+const box=
+document.createElement("div");
+
+box.className="install-box";
+
+box.innerHTML=`
+
+<button
+id="installBtn"
+class="btn"
+>
+<i class="fa-solid fa-download"></i>
+تثبيت التطبيق
+</button>
+
+`;
+
+document.body.appendChild(box);
+
+document
+.getElementById("installBtn")
+.addEventListener(
+"click",
+async function(){
+
+if(!deferredInstallPrompt)
+return;
+
+deferredInstallPrompt.prompt();
+
+await deferredInstallPrompt.userChoice;
+
+deferredInstallPrompt=null;
+
+box.remove();
+
+}
+);
+
+}
+
+}
+);
+
+
+/* =====================================================
+SERVICE WORKER
+===================================================== */
+
+if(
+"serviceWorker" in navigator
+){
+
+window.addEventListener(
+"load",
+function(){
+
+navigator.serviceWorker
+.register("./sw.js")
+.then(
+()=>console.log("Service Worker registered")
+)
+.catch(
+err=>console.warn(
+"Service Worker:",
+err
+)
+);
+
+}
+);
+
+}
+
+
+/* =====================================================
+INIT
+===================================================== */
+
+checkSession();
+
+</script>
+
+</body>
+</html>
