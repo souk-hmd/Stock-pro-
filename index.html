@@ -1,0 +1,3672 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Pro - إدارة المخزن والتجهيزات</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+:root{
+  --primary:#2563eb;
+  --primary-dark:#1d4ed8;
+  --secondary:#64748b;
+  --bg-dark:#0f172a;
+  --bg-card:#1e293b;
+  --bg-input:#334155;
+  --text-main:#f8fafc;
+  --text-muted:#94a3b8;
+  --border:#475569;
+  --danger:#ef4444;
+  --warning:#f59e0b;
+  --success:#10b981;
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+body{
+  background:var(--bg-dark);
+  color:var(--text-main);
+  min-height:100vh;
+  direction:rtl;
+}
+
+header{
+  background:var(--bg-card);
+  padding:1rem 1.5rem;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid var(--border);
+  gap:1rem;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  font-size:1.25rem;
+  font-weight:bold;
+  color:var(--primary);
+}
+
+.user-panel{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+}
+
+#userEmail{
+  color:var(--text-muted);
+  font-size:.9rem;
+}
+
+nav{
+  background:#111827;
+  display:flex;
+  overflow-x:auto;
+  border-bottom:1px solid var(--border);
+}
+
+.nav-btn{
+  padding:.75rem 1.15rem;
+  background:none;
+  border:none;
+  color:var(--text-muted);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  white-space:nowrap;
+  transition:.2s;
+}
+
+.nav-btn.active,
+.nav-btn:hover{
+  color:var(--primary);
+  border-bottom:2px solid var(--primary);
+  background:rgba(37,99,235,.1);
+}
+
+main{
+  width:100%;
+  max-width:1200px;
+  margin:auto;
+  padding:1.5rem;
+}
+
+.view-section{
+  display:none;
+}
+
+.view-section.active{
+  display:block;
+}
+
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:1rem;
+  margin-bottom:1.5rem;
+}
+
+.stat-card{
+  background:var(--bg-card);
+  padding:1.25rem;
+  border-radius:.5rem;
+  border:1px solid var(--border);
+}
+
+.stat-card .title{
+  font-size:.875rem;
+  color:var(--text-muted);
+}
+
+.stat-card .value{
+  font-size:1.75rem;
+  font-weight:bold;
+  margin-top:.5rem;
+}
+
+.controls{
+  display:flex;
+  gap:1rem;
+  margin-bottom:1rem;
+  flex-wrap:wrap;
+}
+
+input,
+select,
+textarea{
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  color:var(--text-main);
+  padding:.65rem .8rem;
+  border-radius:.375rem;
+  outline:none;
+  width:100%;
+}
+
+.controls input{
+  flex:1;
+  min-width:180px;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+  border-color:var(--primary);
+}
+
+.btn{
+  background:var(--primary);
+  color:#fff;
+  border:none;
+  padding:.6rem 1rem;
+  border-radius:.375rem;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.5rem;
+  font-weight:500;
+}
+
+.btn:hover{
+  background:var(--primary-dark);
+}
+
+.btn-danger{
+  background:var(--danger);
+}
+
+.btn-warning{
+  background:var(--warning);
+}
+
+.btn-secondary{
+  background:var(--secondary);
+}
+
+.btn-success{
+  background:var(--success);
+}
+
+.btn-small{
+  padding:.4rem .65rem;
+  font-size:.85rem;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:var(--bg-card);
+  border-radius:.5rem;
+  overflow:hidden;
+}
+
+th,
+td{
+  padding:.75rem 1rem;
+  text-align:right;
+  border-bottom:1px solid var(--border);
+}
+
+th{
+  background:#0f172a;
+  color:var(--text-muted);
+}
+
+tr:hover td{
+  background:rgba(255,255,255,.02);
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.72);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  z-index:1000;
+  padding:1rem;
+}
+
+.modal.show{
+  display:flex;
+}
+
+.modal-content{
+  background:var(--bg-card);
+  padding:1.5rem;
+  border-radius:.5rem;
+  width:100%;
+  max-width:520px;
+  max-height:90vh;
+  overflow:auto;
+  border:1px solid var(--border);
+}
+
+.modal-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:1rem;
+  gap:1rem;
+}
+
+.modal-header button{
+  background:none;
+  border:none;
+  color:#fff;
+  font-size:1.5rem;
+  cursor:pointer;
+}
+
+.form-group{
+  margin-bottom:1rem;
+  display:flex;
+  flex-direction:column;
+  gap:.35rem;
+}
+
+.status{
+  display:inline-block;
+  padding:.25rem .55rem;
+  border-radius:.25rem;
+  font-size:.75rem;
+}
+
+.status-due{
+  background:rgba(239,68,68,.2);
+  color:#fca5a5;
+}
+
+.status-soon{
+  background:rgba(245,158,11,.2);
+  color:#fde047;
+}
+
+.status-good{
+  background:rgba(16,185,129,.2);
+  color:#6ee7b7;
+}
+
+.status-none{
+  background:rgba(148,163,184,.2);
+  color:#cbd5e1;
+}
+
+.card{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:.5rem;
+  padding:1rem;
+  margin-bottom:1rem;
+}
+
+.worker-name{
+  color:var(--primary);
+  margin-bottom:.15rem;
+}
+
+.equipment-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:1rem;
+  border-bottom:1px solid var(--border);
+  padding:.65rem 0;
+}
+
+.equipment-row:last-child{
+  border-bottom:none;
+}
+
+.equipment-info{
+  flex:1;
+}
+
+.equipment-info small{
+  display:block;
+  color:var(--text-muted);
+  margin-top:.2rem;
+}
+
+.empty{
+  text-align:center;
+  padding:2rem;
+  color:var(--text-muted);
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:.5rem;
+}
+
+.admin-badge{
+  background:rgba(37,99,235,.2);
+  color:#93c5fd;
+  padding:.2rem .5rem;
+  border-radius:.3rem;
+  font-size:.75rem;
+}
+
+#toast{
+  position:fixed;
+  bottom:1rem;
+  left:1rem;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  padding:.75rem 1.25rem;
+  border-radius:.375rem;
+  display:none;
+  z-index:3000;
+  max-width:90%;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+
+#toast.show{
+  display:block;
+}
+
+.loading{
+  text-align:center;
+  padding:2rem;
+  color:var(--text-muted);
+}
+
+@media(max-width:700px){
+  header{
+    padding:.8rem;
+  }
+
+  .user-panel{
+    gap:.4rem;
+  }
+
+  #userEmail{
+    max-width:140px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  main{
+    padding:.8rem;
+  }
+
+  table{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+  }
+
+  th,
+  td{
+    padding:.6rem .7rem;
+  }
+
+  .equipment-row{
+    align-items:flex-start;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="brand">
+    <i class="fa-solid fa-boxes-stacked"></i>
+    <span>Stock Pro</span>
+  </div>
+
+  <div class="user-panel">
+    <span id="adminBadge" class="admin-badge" style="display:none;">
+      ADMIN
+    </span>
+
+    <span id="userEmail"></span>
+
+    <button class="btn btn-secondary" onclick="logout()" title="تسجيل الخروج">
+      <i class="fa-solid fa-sign-out"></i>
+    </button>
+  </div>
+</header>
+
+<nav id="mainNav">
+
+  <button class="nav-btn active" onclick="switchTab('stock')">
+    <i class="fa-solid fa-box"></i>
+    <span data-i18n="stock">المخزون</span>
+  </button>
+
+  <button class="nav-btn" onclick="switchTab('movements')">
+    <i class="fa-solid fa-right-left"></i>
+    <span data-i18n="movements">الحركات</span>
+  </button>
+
+  <button class="nav-btn" onclick="switchTab('workers')">
+    <i class="fa-solid fa-users"></i>
+    <span data-i18n="workers">العمال</span>
+  </button>
+
+  <button class="nav-btn" onclick="switchTab('equipment')">
+    <i class="fa-solid fa-shirt"></i>
+    <span data-i18n="equipment">التجهيزات</span>
+  </button>
+
+  <button class="nav-btn" onclick="switchTab('due')">
+    <i class="fa-solid fa-clock-rotate-left"></i>
+    <span data-i18n="due">الاستحقاقات</span>
+  </button>
+
+  <button id="adminNavBtn"
+          class="nav-btn"
+          onclick="switchTab('users')"
+          style="display:none;">
+    <i class="fa-solid fa-user-shield"></i>
+    <span data-i18n="userManagement">إدارة المستخدمين</span>
+  </button>
+
+</nav>
+
+<main>
+
+<!-- ================= STOCK ================= -->
+
+<section id="stockView" class="view-section active">
+
+  <div class="stats-grid">
+
+    <div class="stat-card">
+      <div class="title" data-i18n="totalProducts">
+        إجمالي المنتجات
+      </div>
+      <div class="value" id="productsNumber">0</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="title" data-i18n="todayEntries">
+        دخول اليوم
+      </div>
+      <div class="value" id="entryToday">0</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="title" data-i18n="todayExits">
+        خروج اليوم
+      </div>
+      <div class="value" id="exitToday">0</div>
+    </div>
+
+  </div>
+
+  <div class="controls">
+
+    <input
+      type="text"
+      id="stockSearch"
+      placeholder="بحث عن منتج..."
+      data-placeholder="searchProduct">
+
+    <button class="btn" onclick="openProductModal()">
+      <i class="fa-solid fa-plus"></i>
+      <span data-i18n="newProduct">منتج جديد</span>
+    </button>
+
+    <button class="btn btn-warning" onclick="openMovementModal()">
+      <i class="fa-solid fa-exchange-alt"></i>
+      <span data-i18n="newMovement">تسجيل حركة</span>
+    </button>
+
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>الرمز</th>
+        <th>الاسم</th>
+        <th>الفئة</th>
+        <th>الكمية</th>
+        <th>إجراءات</th>
+      </tr>
+    </thead>
+
+    <tbody id="productsList"></tbody>
+  </table>
+
+</section>
+
+
+<!-- ================= MOVEMENTS ================= -->
+
+<section id="movementsView" class="view-section">
+
+  <div class="controls">
+
+    <input
+      type="text"
+      id="movementSearch"
+      placeholder="بحث بالحركات..."
+      data-placeholder="searchMovements">
+
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>التاريخ</th>
+        <th>النوع</th>
+        <th>المنتج</th>
+        <th>الكمية</th>
+        <th>العامل / الملاحظة</th>
+      </tr>
+    </thead>
+
+    <tbody id="movementsList"></tbody>
+  </table>
+
+</section>
+
+
+<!-- ================= WORKERS ================= -->
+
+<section id="workersView" class="view-section">
+
+  <div class="controls">
+
+    <input
+      type="text"
+      id="workerSearch"
+      placeholder="بحث عن عامل..."
+      data-placeholder="searchWorker">
+
+    <button class="btn" onclick="openWorkerModal()">
+      <i class="fa-solid fa-user-plus"></i>
+      <span data-i18n="newWorker">عامل جديد</span>
+    </button>
+
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>رقم التسجيل</th>
+        <th>الاسم</th>
+        <th>المهنة</th>
+        <th>الحالة</th>
+        <th>إجراءات</th>
+      </tr>
+    </thead>
+
+    <tbody id="workersList"></tbody>
+  </table>
+
+</section>
+
+
+<!-- ================= EQUIPMENT ================= -->
+
+<section id="equipmentView" class="view-section">
+
+  <div class="controls">
+
+    <input
+      type="text"
+      id="equipmentSearch"
+      placeholder="بحث تجهيزات عامل..."
+      data-placeholder="searchEquipment">
+
+    <button class="btn" onclick="openEquipment()">
+      <i class="fa-solid fa-hand-holding"></i>
+      <span data-i18n="deliverEquipment">تسليم تجهيز</span>
+    </button>
+
+  </div>
+
+  <div id="equipmentList"></div>
+
+</section>
+
+
+<!-- ================= DUE ================= -->
+
+<section id="dueView" class="view-section">
+
+  <div class="stats-grid">
+
+    <div class="stat-card">
+      <div class="title" data-i18n="dueToday">
+        تجهيزات مستحقة اليوم أو سابقة
+      </div>
+
+      <div class="value" id="dueToday">0</div>
+    </div>
+
+  </div>
+
+  <div class="controls">
+
+    <input
+      type="text"
+      id="dueSearch"
+      placeholder="تصفية..."
+      data-placeholder="filter">
+
+  </div>
+
+  <div id="dueList"></div>
+
+</section>
+
+
+<!-- ================= USERS ================= -->
+
+<section id="usersView" class="view-section">
+
+  <div class="stats-grid">
+
+    <div class="stat-card">
+      <div class="title">إدارة المستخدمين</div>
+      <div class="value" id="usersNumber">0</div>
+    </div>
+
+  </div>
+
+  <div class="controls">
+
+    <input
+      type="text"
+      id="userSearch"
+      placeholder="بحث عن مستخدم..."
+      data-placeholder="searchUser">
+
+    <button class="btn btn-secondary" onclick="loadUsers()">
+      <i class="fa-solid fa-refresh"></i>
+      تحديث
+    </button>
+
+  </div>
+
+  <div id="usersList"></div>
+
+</section>
+
+</main>
+
+
+<!-- ================= PRODUCT MODAL ================= -->
+
+<div class="modal" id="productModal">
+
+  <div class="modal-content">
+
+    <div class="modal-header">
+
+      <h3 id="productModalTitle">
+        منتج جديد
+      </h3>
+
+      <button onclick="closeProductModal()">
+        &times;
+      </button>
+
+    </div>
+
+    <form id="productForm" onsubmit="saveProduct(event)">
+
+      <input type="hidden" id="productId">
+
+      <div class="form-group">
+        <label>الرمز (Code)</label>
+        <input type="text" id="productCode" required>
+      </div>
+
+      <div class="form-group">
+        <label>الاسم</label>
+        <input type="text" id="productName" required>
+      </div>
+
+      <div class="form-group">
+        <label>الفئة</label>
+        <input type="text" id="productCategory">
+      </div>
+
+      <div class="form-group">
+        <label>الكمية الأولية</label>
+        <input type="number" id="productQty" min="0" value="0">
+      </div>
+
+      <button class="btn" type="submit">
+        حفظ
+      </button>
+
+    </form>
+
+  </div>
+</div>
+
+
+<!-- ================= MOVEMENT MODAL ================= -->
+
+<div class="modal" id="movementModal">
+
+  <div class="modal-content">
+
+    <div class="modal-header">
+
+      <h3>تسجيل حركة مخزون</h3>
+
+      <button onclick="closeMovementModal()">
+        &times;
+      </button>
+
+    </div>
+
+    <form onsubmit="saveMovement(event)">
+
+      <div class="form-group">
+
+        <label>النوع</label>
+
+        <select id="movementType">
+          <option value="entry">دخول (+)</option>
+          <option value="exit">خروج (-)</option>
+        </select>
+
+      </div>
+
+      <div class="form-group">
+
+        <label>المنتج</label>
+
+        <select id="movementProduct" required></select>
+
+      </div>
+
+      <div class="form-group">
+
+        <label>الكمية</label>
+
+        <input
+          type="number"
+          id="movementQty"
+          min="1"
+          value="1"
+          required>
+
+      </div>
+
+      <div class="form-group">
+
+        <label>ملاحظات / رقم السند</label>
+
+        <input type="text" id="movementNote">
+
+      </div>
+
+      <button class="btn" type="submit">
+        تسجيل
+      </button>
+
+    </form>
+
+  </div>
+</div>
+
+
+<!-- ================= WORKER MODAL ================= -->
+
+<div class="modal" id="workerModal">
+
+  <div class="modal-content">
+
+    <div class="modal-header">
+
+      <h3>بيانات العامل</h3>
+
+      <button onclick="closeWorkerModal()">
+        &times;
+      </button>
+
+    </div>
+
+    <form onsubmit="saveWorker(event)">
+
+      <input type="hidden" id="workerId">
+
+      <div class="form-group">
+
+        <label>رقم التسجيل (Matricule)</label>
+
+        <input type="text" id="workerMatricule" required>
+
+      </div>
+
+      <div class="form-group">
+
+        <label>الاسم الكامل</label>
+
+        <input type="text" id="workerName" required>
+
+      </div>
+
+      <div class="form-group">
+
+        <label>الوظيفة / القسم</label>
+
+        <input type="text" id="workerRole">
+
+      </div>
+
+      <button class="btn" type="submit">
+        حفظ
+      </button>
+
+    </form>
+
+  </div>
+</div>
+
+
+<!-- ================= EQUIPMENT MODAL ================= -->
+
+<div class="modal" id="equipmentModal">
+
+  <div class="modal-content">
+
+    <div class="modal-header">
+
+      <h3>تسليم تجهيزات للحماية</h3>
+
+      <button onclick="closeEquipment()">
+        &times;
+      </button>
+
+    </div>
+
+    <div class="form-group">
+
+      <label>العامل</label>
+
+      <select id="equipmentWorker"></select>
+
+    </div>
+
+    <div class="form-group">
+
+      <label>نوع التجهيز</label>
+
+      <select id="equipmentType">
+
+        <option value="shoes">
+          حذاء حماية (Shoes)
+        </option>
+
+        <option value="bleu">
+          بدلة عمل (Bleu de travail)
+        </option>
+
+        <option value="glasses">
+          نظارات حماية (Glasses)
+        </option>
+
+        <option value="gants">
+          قفازات (Gants)
+        </option>
+
+        <option value="vest_soudeur">
+          سترة لحام (Vest soudeur)
+        </option>
+
+      </select>
+
+    </div>
+
+    <div class="form-group">
+
+      <label>تاريخ التسليم</label>
+
+      <input type="date" id="equipmentDate">
+
+    </div>
+
+    <div class="form-group">
+
+      <label>الكمية</label>
+
+      <input type="number" id="equipmentQty" min="1" value="1">
+
+    </div>
+
+    <div class="form-group">
+
+      <label>رقم وصل التسليم (Bon)</label>
+
+      <input type="text" id="equipmentBon">
+
+    </div>
+
+    <div class="form-group">
+
+      <label>ملاحظات</label>
+
+      <input type="text" id="equipmentNote">
+
+    </div>
+
+    <button class="btn" onclick="saveEquipment()">
+      تسجيل التسليم
+    </button>
+
+  </div>
+</div>
+
+
+<div id="toast"></div>
+
+
+<script>
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+/*
+  ضع بيانات مشروع Supabase الحقيقية هنا.
+
+  مهم جداً:
+  استخدم ANON KEY فقط.
+  لا تضع SERVICE ROLE KEY داخل index.html.
+*/
+
+const SUPABASE_URL =
+  "https://YOUR_SUPABASE_URL.supabase.co";
+
+const SUPABASE_ANON_KEY =
+  "YOUR_SUPABASE_ANON_KEY";
+
+const db = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
+
+/* =========================================================
+   ADMIN CONFIG
+========================================================= */
+
+/*
+  ضع بريد حساب الأدمن هنا.
+  هذا يتحكم في ظهور لوحة إدارة المستخدمين فقط.
+
+  حماية قاعدة البيانات يجب أن تكون أيضاً بواسطة RLS.
+*/
+
+const ADMIN_EMAIL =
+  "azizsolo.190@gmail.com";
+
+
+/* =========================================================
+   GLOBALS
+========================================================= */
+
+let currentUser = null;
+let currentLanguage = "ar";
+
+let products = [];
+let movements = [];
+let workers = [];
+let equipment = [];
+let users = [];
+
+
+/* =========================================================
+   TRANSLATIONS
+========================================================= */
+
+const translations = {
+
+  ar: {
+
+    stock:"المخزون",
+    movements:"الحركات",
+    workers:"العمال",
+    equipment:"التجهيزات",
+    due:"الاستحقاقات",
+    userManagement:"إدارة المستخدمين",
+
+    totalProducts:"إجمالي المنتجات",
+    todayEntries:"دخول اليوم",
+    todayExits:"خروج اليوم",
+
+    newProduct:"منتج جديد",
+    newMovement:"تسجيل حركة",
+    newWorker:"عامل جديد",
+    deliverEquipment:"تسليم تجهيز",
+
+    dueToday:"تجهيزات مستحقة اليوم أو سابقة",
+
+    selectWorker:"اختر العامل...",
+
+    shoes:"حذاء حماية",
+    bleu:"بدلة عمل",
+    glasses:"نظارات حماية",
+    gants:"قفازات",
+    vest_soudeur:"سترة لحام",
+
+    dueStatus:"مستحق",
+    soonStatus:"قريب الاستحقاق",
+    goodStatus:"ساري المفعول",
+    notDelivered:"لم يسلم بعد",
+
+    searchProduct:"بحث عن منتج...",
+    searchMovements:"بحث بالحركات...",
+    searchWorker:"بحث عن عامل...",
+    searchEquipment:"بحث تجهيزات عامل...",
+    filter:"تصفية...",
+    searchUser:"بحث عن مستخدم..."
+
+  },
+
+  fr: {
+
+    stock:"Stock",
+    movements:"Mouvements",
+    workers:"Employés",
+    equipment:"Équipements",
+    due:"Échéances",
+    userManagement:"Gestion utilisateurs",
+
+    totalProducts:"Total produits",
+    todayEntries:"Entrées aujourd'hui",
+    todayExits:"Sorties aujourd'hui",
+
+    newProduct:"Nouveau produit",
+    newMovement:"Enregistrer mouvement",
+    newWorker:"Nouvel employé",
+    deliverEquipment:"Livrer équipement",
+
+    dueToday:"Équipements dus aujourd'hui ou dépassés",
+
+    selectWorker:"Choisir l'employé...",
+
+    shoes:"Chaussures de sécurité",
+    bleu:"Bleu de travail",
+    glasses:"Lunettes de protection",
+    gants:"Gants",
+    vest_soudeur:"Gilet soudeur",
+
+    dueStatus:"Échu",
+    soonStatus:"Bientôt échu",
+    goodStatus:"Valide",
+    notDelivered:"Non livré",
+
+    searchProduct:"Rechercher un produit...",
+    searchMovements:"Rechercher mouvements...",
+    searchWorker:"Rechercher employé...",
+    searchEquipment:"Rechercher équipement...",
+    filter:"Filtrer...",
+    searchUser:"Rechercher utilisateur..."
+
+  },
+
+  en: {
+
+    stock:"Stock",
+    movements:"Movements",
+    workers:"Workers",
+    equipment:"Equipment",
+    due:"Due dates",
+    userManagement:"User management",
+
+    totalProducts:"Total products",
+    todayEntries:"Today's entries",
+    todayExits:"Today's exits",
+
+    newProduct:"New product",
+    newMovement:"Record movement",
+    newWorker:"New worker",
+    deliverEquipment:"Deliver equipment",
+
+    dueToday:"Equipment due today or overdue",
+
+    selectWorker:"Select worker...",
+
+    shoes:"Safety shoes",
+    bleu:"Work suit",
+    glasses:"Safety glasses",
+    gants:"Gloves",
+    vest_soudeur:"Welder vest",
+
+    dueStatus:"Due",
+    soonStatus:"Due soon",
+    goodStatus:"Valid",
+    notDelivered:"Not delivered",
+
+    searchProduct:"Search product...",
+    searchMovements:"Search movements...",
+    searchWorker:"Search worker...",
+    searchEquipment:"Search worker equipment...",
+    filter:"Filter...",
+    searchUser:"Search user..."
+
+  }
+
+};
+
+
+function t(key){
+
+  return translations[currentLanguage]?.[key] || key;
+
+}
+
+
+/* =========================================================
+   LANGUAGE
+========================================================= */
+
+function setLanguage(lang){
+
+  if(!translations[lang]) return;
+
+  currentLanguage = lang;
+
+  document.documentElement.lang = lang;
+
+  document.documentElement.dir =
+    lang === "ar" ? "rtl" : "ltr";
+
+  document.querySelectorAll("[data-i18n]")
+    .forEach(el => {
+
+      const key = el.getAttribute("data-i18n");
+
+      el.textContent = t(key);
+
+    });
+
+  document.querySelectorAll("[data-placeholder]")
+    .forEach(el => {
+
+      const key = el.getAttribute("data-placeholder");
+
+      el.placeholder = t(key);
+
+    });
+
+  renderProducts();
+  renderMovements();
+  renderWorkers();
+  renderEquipment();
+  renderDue();
+  renderUsers();
+
+}
+
+
+/* =========================================================
+   DATE UTILITIES
+========================================================= */
+
+function todayKey(){
+
+  const d = new Date();
+
+  const y = d.getFullYear();
+
+  const m = String(d.getMonth()+1).padStart(2,"0");
+
+  const day = String(d.getDate()).padStart(2,"0");
+
+  return `${y}-${m}-${day}`;
+
+}
+
+
+function formatDate(date){
+
+  if(!date) return "-";
+
+  try{
+
+    return new Date(date).toLocaleDateString(
+      currentLanguage === "ar" ? "ar-DZ" : currentLanguage
+    );
+
+  }catch(e){
+
+    return date;
+
+  }
+
+}
+
+
+function addMonths(dateStr, months){
+
+  const d = new Date(`${dateStr}T00:00:00`);
+
+  d.setMonth(d.getMonth()+months);
+
+  return localDateKey(d);
+
+}
+
+
+function addDays(dateStr, days){
+
+  const d = new Date(`${dateStr}T00:00:00`);
+
+  d.setDate(d.getDate()+days);
+
+  return localDateKey(d);
+
+}
+
+
+function localDateKey(d){
+
+  const y = d.getFullYear();
+
+  const m = String(d.getMonth()+1).padStart(2,"0");
+
+  const day = String(d.getDate()).padStart(2,"0");
+
+  return `${y}-${m}-${day}`;
+
+}
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+function switchTab(tabId){
+
+  document.querySelectorAll(".nav-btn")
+    .forEach(btn => btn.classList.remove("active"));
+
+  document.querySelectorAll(".view-section")
+    .forEach(sec => sec.classList.remove("active"));
+
+  const targetBtn =
+    document.querySelector(
+      `[onclick="switchTab('${tabId}')"]`
+    );
+
+  const targetSec =
+    document.getElementById(`${tabId}View`);
+
+  if(targetBtn)
+    targetBtn.classList.add("active");
+
+  if(targetSec)
+    targetSec.classList.add("active");
+
+}
+
+
+/* =========================================================
+   SESSION
+========================================================= */
+
+async function checkSession(){
+
+  try{
+
+    const {
+      data,
+      error
+    } = await db.auth.getSession();
+
+    if(error){
+
+      console.error(error);
+
+      toast("تعذر التحقق من تسجيل الدخول ❌");
+
+      return;
+
+    }
+
+    if(data?.session){
+
+      currentUser = data.session.user;
+
+      document.getElementById("userEmail")
+        .textContent = currentUser.email || "";
+
+      updateAdminUI();
+
+      await loadAllData();
+
+    }else{
+
+      document.getElementById("userEmail")
+        .textContent = "غير مسجل الدخول";
+
+      /*
+        إذا كانت لديك صفحة login منفصلة،
+        ضع التحويل إليها هنا.
+      */
+
+    }
+
+  }catch(error){
+
+    console.error(error);
+
+    toast("حدث خطأ أثناء الاتصال ❌");
+
+  }
+
+}
+
+
+db.auth.onAuthStateChange(
+  async (event, session) => {
+
+    if(session?.user){
+
+      currentUser = session.user;
+
+      const email =
+        currentUser.email || "";
+
+      document.getElementById("userEmail")
+        .textContent = email;
+
+      updateAdminUI();
+
+    }else{
+
+      currentUser = null;
+
+    }
+
+  }
+);
+
+
+async function logout(){
+
+  const {error} =
+    await db.auth.signOut();
+
+  if(error){
+
+    toast("تعذر تسجيل الخروج ❌");
+
+    return;
+
+  }
+
+  window.location.reload();
+
+}
+
+
+/* =========================================================
+   ADMIN
+========================================================= */
+
+function isAdmin(){
+
+  if(!currentUser) return false;
+
+  return (
+    String(currentUser.email || "")
+      .toLowerCase()
+      === ADMIN_EMAIL.toLowerCase()
+  );
+
+}
+
+
+function updateAdminUI(){
+
+  const admin =
+    isAdmin();
+
+  document.getElementById("adminNavBtn")
+    .style.display = admin ? "flex" : "none";
+
+  document.getElementById("adminBadge")
+    .style.display = admin ? "inline-block" : "none";
+
+}
+
+
+async function loadUsers(){
+
+  if(!isAdmin()){
+
+    toast("غير مسموح لك بالدخول إلى إدارة المستخدمين ❌");
+
+    return;
+
+  }
+
+  /*
+    هذا الجزء يفترض وجود جدول profiles
+    يحتوي على:
+    id
+    email
+    full_name
+    role
+    active
+
+    إذا لم يكن جدول profiles موجوداً،
+    لن يتمكن هذا الجزء من تحميل المستخدمين.
+  */
+
+  const {data,error} =
+    await db
+      .from("profiles")
+      .select("*")
+      .order("email");
+
+  if(error){
+
+    console.error(error);
+
+    users = [];
+
+    renderUsers();
+
+    toast(
+      "تعذر تحميل المستخدمين: "
+      + error.message
+    );
+
+    return;
+
+  }
+
+  users = data || [];
+
+  renderUsers();
+
+}
+
+
+function renderUsers(){
+
+  const box =
+    document.getElementById("usersList");
+
+  if(!box) return;
+
+  const search =
+    (
+      document.getElementById("userSearch")?.value
+      || ""
+    )
+    .toLowerCase()
+    .trim();
+
+  const filtered =
+    users.filter(u => {
+
+      const email =
+        String(u.email || "")
+          .toLowerCase();
+
+      const name =
+        String(u.full_name || "")
+          .toLowerCase();
+
+      return (
+        !search ||
+        email.includes(search) ||
+        name.includes(search)
+      );
+
+    });
+
+  document.getElementById("usersNumber")
+    .textContent = users.length;
+
+  if(!filtered.length){
+
+    box.innerHTML =
+      `<div class="empty">
+        لا يوجد مستخدمون
+      </div>`;
+
+    return;
+
+  }
+
+  box.innerHTML = "";
+
+  filtered.forEach(u => {
+
+    const card =
+      document.createElement("div");
+
+    card.className = "card";
+
+    const active =
+      u.active !== false;
+
+    const role =
+      u.role || "user";
+
+    card.innerHTML = `
+
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:1rem;
+        flex-wrap:wrap;
+      ">
+
+        <div>
+
+          <strong>
+            ${safe(u.full_name || "بدون اسم")}
+          </strong>
+
+          <div style="
+            color:var(--text-muted);
+            margin-top:.25rem;
+          ">
+            ${safe(u.email || "")}
+          </div>
+
+          <div style="
+            margin-top:.4rem;
+          ">
+            <span class="status ${
+              active
+              ? "status-good"
+              : "status-due"
+            }">
+              ${active ? "نشط" : "موقوف"}
+            </span>
+
+            <span class="admin-badge">
+              ${safe(role)}
+            </span>
+          </div>
+
+        </div>
+
+        <div>
+
+          ${
+            u.id === currentUser.id
+            ? `<span class="status status-good">
+                الحساب الحالي
+              </span>`
+            : `
+              <button
+                class="btn ${
+                  active
+                  ? "btn-danger"
+                  : "btn-success"
+                } btn-small"
+                onclick="toggleUser('${safeAttr(u.id)}',${!active})"
+              >
+                <i class="fa-solid ${
+                  active
+                  ? "fa-ban"
+                  : "fa-check"
+                }"></i>
+
+                ${active ? "إيقاف" : "تفعيل"}
+
+              </button>
+            `
+          }
+
+        </div>
+
+      </div>
+    `;
+
+    box.appendChild(card);
+
+  });
+
+}
+
+
+async function toggleUser(id,newStatus){
+
+  if(!isAdmin()){
+
+    toast("غير مسموح ❌");
+
+    return;
+
+  }
+
+  if(!id) return;
+
+  const {error} =
+    await db
+      .from("profiles")
+      .update({
+        active:newStatus
+      })
+      .eq("id",id);
+
+  if(error){
+
+    console.error(error);
+
+    toast(
+      "تعذر تعديل حالة المستخدم ❌"
+    );
+
+    return;
+
+  }
+
+  await loadUsers();
+
+  toast(
+    newStatus
+    ? "تم تفعيل المستخدم ✅"
+    : "تم إيقاف المستخدم ✅"
+  );
+
+}
+
+
+/* =========================================================
+   LOAD ALL
+========================================================= */
+
+async function loadAllData(){
+
+  if(!currentUser) return;
+
+  await Promise.all([
+    loadProducts(),
+    loadMovements(),
+    loadWorkers(),
+    loadEquipment()
+  ]);
+
+  statistics();
+
+  if(isAdmin())
+    await loadUsers();
+
+}
+
+
+/* =========================================================
+   PRODUCTS
+========================================================= */
+
+async function loadProducts(){
+
+  if(!currentUser) return;
+
+  const {
+    data,
+    error
+  } =
+    await db
+      .from("products")
+      .select("*")
+      .eq("user_id",currentUser.id)
+      .order("name");
+
+  if(error){
+
+    console.error(error);
+
+    toast(
+      "تعذر تحميل المنتجات ❌"
+    );
+
+    return;
+
+  }
+
+  products =
+    data || [];
+
+  renderProducts();
+
+}
+
+
+function renderProducts(){
+
+  const tbody =
+    document.getElementById("productsList");
+
+  if(!tbody) return;
+
+  const search =
+    (
+      document.getElementById("stockSearch")?.value
+      || ""
+    )
+    .toLowerCase()
+    .trim();
+
+  tbody.innerHTML = "";
+
+  const filtered =
+    products.filter(p => {
+
+      const name =
+        String(p.name || "")
+          .toLowerCase();
+
+      const code =
+        String(p.code || "")
+          .toLowerCase();
+
+      const category =
+        String(p.category || "")
+          .toLowerCase();
+
+      return (
+        !search ||
+        name.includes(search) ||
+        code.includes(search) ||
+        category.includes(search)
+      );
+
+    });
+
+  if(!filtered.length){
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5"
+            style="text-align:center;color:var(--text-muted);">
+          لا توجد منتجات
+        </td>
+      </tr>
+    `;
+
+    return;
+
+  }
+
+  filtered.forEach(p => {
+
+    const tr =
+      document.createElement("tr");
+
+    tr.innerHTML = `
+
+      <td>${safe(p.code)}</td>
+
+      <td>${safe(p.name)}</td>
+
+      <td>${safe(p.category)}</td>
+
+      <td>
+        <strong>${Number(p.quantity)||0}</strong>
+      </td>
+
+      <td>
+
+        <button
+          class="btn btn-secondary btn-small"
+          onclick="editProduct('${safeAttr(p.id)}')">
+
+          <i class="fa-solid fa-pen"></i>
+
+        </button>
+
+        <button
+          class="btn btn-danger btn-small"
+          onclick="deleteProduct('${safeAttr(p.id)}')">
+
+          <i class="fa-solid fa-trash"></i>
+
+        </button>
+
+      </td>
+
+    `;
+
+    tbody.appendChild(tr);
+
+  });
+
+}
+
+
+function openProductModal(id=null){
+
+  const form =
+    document.getElementById("productForm");
+
+  document.getElementById("productId")
+    .value = id || "";
+
+  if(id){
+
+    const p =
+      products.find(
+        item => item.id === id
+      );
+
+    if(!p){
+
+      toast("المنتج غير موجود ❌");
+
+      return;
+
+    }
+
+    document.getElementById("productModalTitle")
+      .textContent = "تعديل المنتج";
+
+    document.getElementById("productCode")
+      .value = p.code || "";
+
+    document.getElementById("productName")
+      .value = p.name || "";
+
+    document.getElementById("productCategory")
+      .value = p.category || "";
+
+    document.getElementById("productQty")
+      .value = Number(p.quantity)||0;
+
+  }else{
+
+    form.reset();
+
+    document.getElementById("productId")
+      .value = "";
+
+    document.getElementById("productQty")
+      .value = 0;
+
+    document.getElementById("productModalTitle")
+      .textContent = "منتج جديد";
+
+  }
+
+  document.getElementById("productModal")
+    .classList.add("show");
+
+}
+
+
+function editProduct(id){
+
+  openProductModal(id);
+
+}
+
+
+function closeProductModal(){
+
+  document.getElementById("productModal")
+    .classList.remove("show");
+
+}
+
+
+async function saveProduct(e){
+
+  e.preventDefault();
+
+  if(!currentUser){
+
+    toast("يجب تسجيل الدخول ❌");
+
+    return;
+
+  }
+
+  const id =
+    document.getElementById("productId").value;
+
+  const code =
+    document.getElementById("productCode")
+      .value.trim();
+
+  const name =
+    document.getElementById("productName")
+      .value.trim();
+
+  const category =
+    document.getElementById("productCategory")
+      .value.trim();
+
+  const quantity =
+    Number(
+      document.getElementById("productQty").value
+    ) || 0;
+
+  if(!code || !name){
+
+    toast("أدخل الرمز والاسم ❌");
+
+    return;
+
+  }
+
+  if(quantity < 0){
+
+    toast("الكمية لا يمكن أن تكون سالبة ❌");
+
+    return;
+
+  }
+
+  const obj = {
+
+    user_id:currentUser.id,
+    code,
+    name,
+    category,
+    quantity
+
+  };
+
+  let result;
+
+  if(id){
+
+    result =
+      await db
+        .from("products")
+        .update(obj)
+        .eq("id",id)
+        .eq("user_id",currentUser.id);
+
+  }else{
+
+    result =
+      await db
+        .from("products")
+        .insert(obj);
+
+  }
+
+  if(result.error){
+
+    console.error(result.error);
+
+    toast(
+      "تعذر حفظ المنتج ❌\n"
+      + result.error.message
+    );
+
+    return;
+
+  }
+
+  closeProductModal();
+
+  await loadProducts();
+
+  statistics();
+
+  toast(
+    id
+    ? "تم تعديل المنتج ✅"
+    : "تم إضافة المنتج ✅"
+  );
+
+}
+
+
+async function deleteProduct(id){
+
+  if(!currentUser) return;
+
+  const p =
+    products.find(
+      item => item.id === id
+    );
+
+  if(!p) return;
+
+  if(
+    !confirm(
+      "هل أنت متأكد من حذف المنتج؟\n\n"
+      + p.name
+    )
+  ) return;
+
+  const {error} =
+    await db
+      .from("products")
+      .delete()
+      .eq("id",id)
+      .eq("user_id",currentUser.id);
+
+  if(error){
+
+    toast(
+      "تعذر حذف المنتج ❌\n"
+      + error.message
+    );
+
+    return;
+
+  }
+
+  await loadProducts();
+
+  statistics();
+
+  toast("تم حذف المنتج ✅");
+
+}
+
+
+/* =========================================================
+   MOVEMENTS
+========================================================= */
+
+async function loadMovements(){
+
+  if(!currentUser) return;
+
+  const {
+    data,
+    error
+  } =
+    await db
+      .from("movements")
+      .select("*")
+      .eq("user_id",currentUser.id)
+      .order("created_at",{
+        ascending:false
+      });
+
+  if(error){
+
+    console.error(error);
+
+    toast("تعذر تحميل الحركات ❌");
+
+    return;
+
+  }
+
+  movements =
+    data || [];
+
+  renderMovements();
+
+}
+
+
+function renderMovements(){
+
+  const tbody =
+    document.getElementById("movementsList");
+
+  if(!tbody) return;
+
+  const search =
+    (
+      document.getElementById("movementSearch")?.value
+      || ""
+    )
+    .toLowerCase()
+    .trim();
+
+  tbody.innerHTML = "";
+
+  const filtered =
+    movements.filter(m => {
+
+      const product =
+        String(m.product_name || "")
+          .toLowerCase();
+
+      const note =
+        String(m.note || "")
+          .toLowerCase();
+
+      const type =
+        m.type === "entry"
+        ? "دخول"
+        : "خروج";
+
+      return (
+        !search ||
+        product.includes(search) ||
+        note.includes(search) ||
+        type.includes(search)
+      );
+
+    });
+
+  if(!filtered.length){
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5"
+            style="text-align:center;color:var(--text-muted);">
+          لا توجد حركات
+        </td>
+      </tr>
+    `;
+
+    return;
+
+  }
+
+  filtered.forEach(m => {
+
+    const tr =
+      document.createElement("tr");
+
+    const date =
+      m.created_at
+      ? formatDate(m.created_at)
+      : "-";
+
+    tr.innerHTML = `
+
+      <td>${safe(date)}</td>
+
+      <td>
+
+        <span class="status ${
+          m.type === "entry"
+          ? "status-good"
+          : "status-due"
+        }">
+
+          ${
+            m.type === "entry"
+            ? "دخول"
+            : "خروج"
+          }
+
+        </span>
+
+      </td>
+
+      <td>${safe(m.product_name)}</td>
+
+      <td>${Number(m.quantity)||0}</td>
+
+      <td>${safe(m.note)}</td>
+
+    `;
+
+    tbody.appendChild(tr);
+
+  });
+
+}
+
+
+function openMovementModal(){
+
+  if(!currentUser) return;
+
+  const select =
+    document.getElementById(
+      "movementProduct"
+    );
+
+  select.innerHTML = "";
+
+  if(!products.length){
+
+    select.innerHTML =
+      `<option value="">
+        لا توجد منتجات
+      </option>`;
+
+  }else{
+
+    products.forEach(p => {
+
+      const opt =
+        document.createElement("option");
+
+      opt.value = p.id;
+
+      opt.textContent =
+        `${p.name} (${Number(p.quantity)||0})`;
+
+      select.appendChild(opt);
+
+    });
+
+  }
+
+  document.getElementById("movementModal")
+    .classList.add("show");
+
+}
+
+
+function closeMovementModal(){
+
+  document.getElementById("movementModal")
+    .classList.remove("show");
+
+}
+
+
+async function saveMovement(e){
+
+  e.preventDefault();
+
+  if(!currentUser) return;
+
+  const pId =
+    document.getElementById(
+      "movementProduct"
+    ).value;
+
+  const type =
+    document.getElementById(
+      "movementType"
+    ).value;
+
+  const qty =
+    Number(
+      document.getElementById(
+        "movementQty"
+      ).value
+    );
+
+  const note =
+    document.getElementById(
+      "movementNote"
+    ).value.trim();
+
+  if(!pId || !qty || qty < 1){
+
+    toast("أدخل بيانات صحيحة ❌");
+
+    return;
+
+  }
+
+  const prod =
+    products.find(
+      p => p.id === pId
+    );
+
+  if(!prod){
+
+    toast("المنتج غير موجود ❌");
+
+    return;
+
+  }
+
+  const currentQty =
+    Number(prod.quantity)||0;
+
+  let newQty;
+
+  if(type === "entry"){
+
+    newQty =
+      currentQty + qty;
+
+  }else{
+
+    if(qty > currentQty){
+
+      toast(
+        `المخزون غير كافٍ. المتوفر: ${currentQty}`
+      );
+
+      return;
+
+    }
+
+    newQty =
+      currentQty - qty;
+
+  }
+
+  /*
+    تسجيل الحركة أولاً.
+  */
+
+  const movementResult =
+    await db
+      .from("movements")
+      .insert({
+
+        user_id:currentUser.id,
+        product_id:pId,
+        product_name:prod.name,
+        type,
+        quantity:qty,
+        note
+
+      });
+
+  if(movementResult.error){
+
+    console.error(
+      movementResult.error
+    );
+
+    toast(
+      "تعذر تسجيل الحركة ❌\n"
+      + movementResult.error.message
+    );
+
+    return;
+
+  }
+
+  /*
+    تحديث الكمية.
+  */
+
+  const productResult =
+    await db
+      .from("products")
+      .update({
+        quantity:newQty
+      })
+      .eq("id",pId)
+      .eq("user_id",currentUser.id);
+
+  if(productResult.error){
+
+    console.error(
+      productResult.error
+    );
+
+    toast(
+      "تم تسجيل الحركة لكن تعذر تحديث المخزون ❌"
+    );
+
+    await loadProducts();
+
+    return;
+
+  }
+
+  closeMovementModal();
+
+  document.getElementById("movementNote")
+    .value = "";
+
+  await loadProducts();
+  await loadMovements();
+
+  statistics();
+
+  toast("تم تسجيل الحركة وتحديث المخزون ✅");
+
+}
+
+
+/* =========================================================
+   WORKERS
+========================================================= */
+
+async function loadWorkers(){
+
+  if(!currentUser) return;
+
+  const {
+    data,
+    error
+  } =
+    await db
+      .from("workers")
+      .select("*")
+      .eq("user_id",currentUser.id)
+      .order("name");
+
+  if(error){
+
+    console.error(error);
+
+    toast("تعذر تحميل العمال ❌");
+
+    return;
+
+  }
+
+  workers =
+    data || [];
+
+  renderWorkers();
+
+}
+
+
+function renderWorkers(){
+
+  const tbody =
+    document.getElementById(
+      "workersList"
+    );
+
+  if(!tbody) return;
+
+  const search =
+    (
+      document.getElementById(
+        "workerSearch"
+      )?.value || ""
+    )
+    .toLowerCase()
+    .trim();
+
+  tbody.innerHTML = "";
+
+  const filtered =
+    workers.filter(w => {
+
+      const name =
+        String(w.name || "")
+          .toLowerCase();
+
+      const matricule =
+        String(w.matricule || "")
+          .toLowerCase();
+
+      const role =
+        String(w.role || "")
+          .toLowerCase();
+
+      return (
+        !search ||
+        name.includes(search) ||
+        matricule.includes(search) ||
+        role.includes(search)
+      );
+
+    });
+
+  if(!filtered.length){
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5"
+            style="text-align:center;color:var(--text-muted);">
+          لا يوجد عمال
+        </td>
+      </tr>
+    `;
+
+    return;
+
+  }
+
+  filtered.forEach(w => {
+
+    const tr =
+      document.createElement("tr");
+
+    tr.innerHTML = `
+
+      <td>${safe(w.matricule)}</td>
+
+      <td>${safe(w.name)}</td>
+
+      <td>${safe(w.role)}</td>
+
+      <td>
+        <span class="status ${
+          w.status === "active"
+          ? "status-good"
+          : "status-due"
+        }">
+
+          ${
+            w.status === "active"
+            ? "نشط"
+            : "موقوف"
+          }
+
+        </span>
+      </td>
+
+      <td>
+
+        <button
+          class="btn btn-danger btn-small"
+          onclick="deleteWorker('${safeAttr(w.id)}')">
+
+          <i class="fa-solid fa-trash"></i>
+
+        </button>
+
+      </td>
+
+    `;
+
+    tbody.appendChild(tr);
+
+  });
+
+}
+
+
+function openWorkerModal(){
+
+  document.getElementById("workerId")
+    .value = "";
+
+  document.getElementById("workerMatricule")
+    .value = "";
+
+  document.getElementById("workerName")
+    .value = "";
+
+  document.getElementById("workerRole")
+    .value = "";
+
+  document.getElementById("workerModal")
+    .classList.add("show");
+
+}
+
+
+function closeWorkerModal(){
+
+  document.getElementById("workerModal")
+    .classList.remove("show");
+
+}
+
+
+async function saveWorker(e){
+
+  e.preventDefault();
+
+  if(!currentUser) return;
+
+  const matricule =
+    document.getElementById(
+      "workerMatricule"
+    ).value.trim();
+
+  const name =
+    document.getElementById(
+      "workerName"
+    ).value.trim();
+
+  const role =
+    document.getElementById(
+      "workerRole"
+    ).value.trim();
+
+  if(!matricule || !name){
+
+    toast(
+      "أدخل رقم التسجيل والاسم ❌"
+    );
+
+    return;
+
+  }
+
+  const existing =
+    workers.find(
+      w =>
+        String(w.matricule)
+          .toLowerCase()
+        ===
+        matricule.toLowerCase()
+    );
+
+  if(existing){
+
+    toast(
+      "رقم التسجيل موجود مسبقاً لهذا المستخدم ❌"
+    );
+
+    return;
+
+  }
+
+  const {error} =
+    await db
+      .from("workers")
+      .insert({
+
+        user_id:currentUser.id,
+        matricule,
+        name,
+        role,
+        status:"active"
+
+      });
+
+  if(error){
+
+    console.error(error);
+
+    toast(
+      "تعذر إضافة العامل ❌\n"
+      + error.message
+    );
+
+    return;
+
+  }
+
+  closeWorkerModal();
+
+  await loadWorkers();
+
+  renderEquipment();
+  renderDue();
+
+  toast("تم إضافة العامل ✅");
+
+}
+
+
+async function deleteWorker(id){
+
+  if(!currentUser) return;
+
+  const w =
+    workers.find(
+      item => item.id === id
+    );
+
+  if(!w) return;
+
+  if(
+    !confirm(
+      "هل أنت متأكد من حذف العامل؟\n\n"
+      + w.name
+    )
+  ) return;
+
+  /*
+    نحاول حذف تجهيزاته أولاً.
+  */
+
+  const equipmentDelete =
+    await db
+      .from("equipment")
+      .delete()
+      .eq(
+        "worker_matricule",
+        w.matricule
+      )
+      .eq(
+        "user_id",
+        currentUser.id
+      );
+
+  if(equipmentDelete.error){
+
+    console.error(
+      equipmentDelete.error
+    );
+
+    toast(
+      "تعذر حذف تجهيزات العامل ❌"
+    );
+
+    return;
+
+  }
+
+  const {error} =
+    await db
+      .from("workers")
+      .delete()
+      .eq("id",id)
+      .eq("user_id",currentUser.id);
+
+  if(error){
+
+    console.error(error);
+
+    toast(
+      "تعذر حذف العامل ❌"
+    );
+
+    return;
+
+  }
+
+  await loadWorkers();
+  await loadEquipment();
+
+  renderDue();
+
+  toast("تم حذف العامل وتجهيزاته ✅");
+
+}
+
+
+/* =========================================================
+   EQUIPMENT
+========================================================= */
+
+async function loadEquipment(){
+
+  if(!currentUser) return;
+
+  const {
+    data,
+    error
+  } =
+    await db
+      .from("equipment")
+      .select("*")
+      .eq("user_id",currentUser.id);
+
+  if(error){
+
+    console.error(error);
+
+    toast(
+      "تعذر تحميل التجهيزات ❌"
+    );
+
+    return;
+
+  }
+
+  equipment =
+    data || [];
+
+  renderEquipment();
+  renderDue();
+
+}
+
+
+function openEquipment(){
+
+  if(!currentUser) return;
+
+  const select =
+    document.getElementById(
+      "equipmentWorker"
+    );
+
+  select.innerHTML =
+    `<option value="">
+      ${t("selectWorker")}
+    </option>`;
+
+  workers
+    .filter(
+      w => w.status === "active"
+    )
+    .forEach(w => {
+
+      const opt =
+        document.createElement(
+          "option"
+        );
+
+      opt.value =
+        w.matricule;
+
+      opt.textContent =
+        `${w.name} (${w.matricule})`;
+
+      select.appendChild(opt);
+
+    });
+
+  document.getElementById(
+    "equipmentDate"
+  ).value = todayKey();
+
+  document.getElementById(
+    "equipmentQty"
+  ).value = 1;
+
+  document.getElementById(
+    "equipmentBon"
+  ).value = "";
+
+  document.getElementById(
+    "equipmentNote"
+  ).value = "";
+
+  document.getElementById(
+    "equipmentModal"
+  ).classList.add("show");
+
+}
+
+
+function closeEquipment(){
+
+  document.getElementById(
+    "equipmentModal"
+  ).classList.remove("show");
+
+}
+
+
+/*
+  فترات الاستحقاق:
+  Shoes = سنة
+  Bleu = 6 أشهر
+  Glasses = 6 أشهر
+  Gants = 30 يوماً
+  Vest soudeur = 6 أشهر
+*/
+
+function getEquipmentInterval(type){
+
+  switch(type){
+
+    case "shoes":
+      return {
+        months:12,
+        days:0
+      };
+
+    case "bleu":
+      return {
+        months:6,
+        days:0
+      };
+
+    case "glasses":
+      return {
+        months:6,
+        days:0
+      };
+
+    case "gants":
+      return {
+        months:0,
+        days:30
+      };
+
+    case "vest_soudeur":
+      return {
+        months:6,
+        days:0
+      };
+
+    default:
+      return {
+        months:6,
+        days:0
+      };
+
+  }
+
+}
+
+
+function calculateNextDueDate(
+  lastDate,
+  type
+){
+
+  if(!lastDate)
+    return null;
+
+  const interval =
+    getEquipmentInterval(type);
+
+  if(interval.months > 0){
+
+    return addMonths(
+      lastDate,
+      interval.months
+    );
+
+  }
+
+  if(interval.days > 0){
+
+    return addDays(
+      lastDate,
+      interval.days
+    );
+
+  }
+
+  return null;
+
+}
+
+
+function getDueStatus(
+  nextDueDate
+){
+
+  if(!nextDueDate)
+    return "none";
+
+  const today =
+    new Date(
+      `${todayKey()}T00:00:00`
+    );
+
+  const due =
+    new Date(
+      `${nextDueDate}T00:00:00`
+    );
+
+  const diffTime =
+    due - today;
+
+  const diffDays =
+    Math.ceil(
+      diffTime /
+      (1000*60*60*24)
+    );
+
+  if(diffDays <= 0)
+    return "due";
+
+  if(diffDays <= 30)
+    return "soon";
+
+  return "good";
+
+}
+
+
+async function saveEquipment(){
+
+  if(!currentUser) return;
+
+  const matricule =
+    document.getElementById(
+      "equipmentWorker"
+    ).value;
+
+  const type =
+    document.getElementById(
+      "equipmentType"
+    ).value;
+
+  const lastDate =
+    document.getElementById(
+      "equipmentDate"
+    ).value;
+
+  const qty =
+    Number(
+      document.getElementById(
+        "equipmentQty"
+      ).value
+    ) || 1;
+
+  if(
+    !matricule ||
+    !lastDate ||
+    qty < 1
+  ){
+
+    toast(
+      "اختر العامل والتاريخ والكمية الصحيحة ❌"
+    );
+
+    return;
+
+  }
+
+  const worker =
+    workers.find(
+      w =>
+        String(w.matricule)
+        === String(matricule)
+    );
+
+  if(!worker){
+
+    toast(
+      "العامل غير موجود ❌"
+    );
+
+    return;
+
+  }
+
+  const nextDueDate =
+    calculateNextDueDate(
+      lastDate,
+      type
+    );
+
+  const obj = {
+
+    user_id:currentUser.id,
+
+    worker_matricule:
+      matricule,
+
+    worker_name:
+      worker.name || "",
+
+    equipment_type:
+      type,
+
+    last_date:
+      lastDate,
+
+    next_due_date:
+      nextDueDate,
+
+    quantity:
+      qty,
+
+    bon:
+      document.getElementById(
+        "equipmentBon"
+      ).value.trim(),
+
+    note:
+      document.getElementById(
+        "equipmentNote"
+      ).value.trim(),
+
+    updated_at:
+      new Date().toISOString()
+
+  };
+
+  /*
+    upsert يحتاج Unique Constraint:
+    user_id + worker_matricule + equipment_type
+  */
+
+  const {error} =
+    await db
+      .from("equipment")
+      .upsert(
+        obj,
+        {
+          onConflict:
+            "user_id,worker_matricule,equipment_type"
+        }
+      );
+
+  if(error){
+
+    console.error(error);
+
+    toast(
+      "تعذر تسجيل التجهيز ❌\n"
+      + error.message
+    );
+
+    return;
+
+  }
+
+  await loadEquipment();
+
+  closeEquipment();
+
+  toast(
+    "تم تسجيل تسليم التجهيز ✅"
+  );
+
+}
+
+
+function renderEquipment(){
+
+  const box =
+    document.getElementById(
+      "equipmentList"
+    );
+
+  if(!box) return;
+
+  const search =
+    (
+      document.getElementById(
+        "equipmentSearch"
+      )?.value || ""
+    )
+    .toLowerCase()
+    .trim();
+
+  const activeWorkers =
+    workers.filter(w => {
+
+      const name =
+        String(w.name || "")
+          .toLowerCase();
+
+      const matricule =
+        String(w.matricule || "")
+          .toLowerCase();
+
+      return (
+        !search ||
+        name.includes(search) ||
+        matricule.includes(search)
+      );
+
+    });
+
+  if(!activeWorkers.length){
+
+    box.innerHTML =
+      `<div class="empty">
+        لا يوجد عمال متطابقون
+      </div>`;
+
+    return;
+
+  }
+
+  box.innerHTML = "";
+
+  const types = [
+    "shoes",
+    "bleu",
+    "glasses",
+    "gants",
+    "vest_soudeur"
+  ];
+
+  activeWorkers.forEach(w => {
+
+    const card =
+      document.createElement("div");
+
+    card.className = "card";
+
+    let itemsHtml = "";
+
+    types.forEach(typeKey => {
+
+      const eq =
+        equipment.find(
+          e =>
+            String(e.worker_matricule)
+            ===
+            String(w.matricule)
+            &&
+            e.equipment_type
+            === typeKey
+        );
+
+      const status =
+        eq
+        ? getDueStatus(
+            eq.next_due_date
+          )
+        : "none";
+
+      const statusClass =
+        status === "due"
+        ? "status-due"
+        : status === "soon"
+        ? "status-soon"
+        : status === "good"
+        ? "status-good"
+        : "status-none";
+
+      const statusText =
+        status === "due"
+        ? t("dueStatus")
+        : status === "soon"
+        ? t("soonStatus")
+        : status === "good"
+        ? t("goodStatus")
+        : t("notDelivered");
+
+      itemsHtml += `
+
+        <div class="equipment-row">
+
+          <div class="equipment-info">
+
+            <strong>
+              ${safe(t(typeKey))}
+            </strong>
+
+            <small>
+              آخر تسليم:
+              ${formatDate(eq?.last_date)}
+            </small>
+
+            <small>
+              الاستحقاق:
+              ${formatDate(eq?.next_due_date)}
+            </small>
+
+            ${
+              eq
+              ? `
+                <small>
+                  الكمية:
+                  ${Number(eq.quantity)||0}
+                </small>
+              `
+              : ""
+            }
+
+          </div>
+
+          <span class="status ${statusClass}">
+            ${statusText}
+          </span>
+
+        </div>
+
+      `;
+
+    });
+
+    card.innerHTML = `
+
+      <div style="margin-bottom:.5rem;">
+
+        <h4 class="worker-name">
+          ${safe(w.name)}
+        </h4>
+
+        <small style="color:var(--text-muted);">
+          Matricule:
+          ${safe(w.matricule)}
+        </small>
+
+      </div>
+
+      <div>
+        ${itemsHtml}
+      </div>
+
+    `;
+
+    box.appendChild(card);
+
+  });
+
+}
+
+
+/* =========================================================
+   DUE
+========================================================= */
+
+function renderDue(){
+
+  const box =
+    document.getElementById(
+      "dueList"
+    );
+
+  if(!box) return;
+
+  const search =
+    (
+      document.getElementById(
+        "dueSearch"
+      )?.value || ""
+    )
+    .toLowerCase()
+    .trim();
+
+  let dueCount = 0;
+
+  box.innerHTML = "";
+
+  const types = [
+    "shoes",
+    "bleu",
+    "glasses",
+    "gants",
+    "vest_soudeur"
+  ];
+
+  workers
+    .filter(
+      w => w.status === "active"
+    )
+    .forEach(w => {
+
+      const name =
+        String(w.name || "")
+          .toLowerCase();
+
+      const matricule =
+        String(w.matricule || "")
+          .toLowerCase();
+
+      if(
+        search &&
+        !name.includes(search) &&
+        !matricule.includes(search)
+      ){
+
+        return;
+
+      }
+
+      const dueItems = [];
+
+      types.forEach(typeKey => {
+
+        const eq =
+          equipment.find(
+            e =>
+              String(e.worker_matricule)
+              ===
+              String(w.matricule)
+              &&
+              e.equipment_type
+              === typeKey
+          );
+
+        const status =
+          eq
+          ? getDueStatus(
+              eq.next_due_date
+            )
+          : "none";
+
+        if(
+          status === "due" ||
+          status === "soon" ||
+          status === "none"
+        ){
+
+          if(status === "due")
+            dueCount++;
+
+          dueItems.push({
+            type:typeKey,
+            eq,
+            status
+          });
+
+        }
+
+      });
+
+      if(!dueItems.length)
+        return;
+
+      const card =
+        document.createElement("div");
+
+      card.className = "card";
+
+      let itemsHtml = "";
+
+      dueItems.forEach(item => {
+
+        const statusClass =
+          item.status === "due"
+          ? "status-due"
+          : item.status === "soon"
+          ? "status-soon"
+          : "status-none";
+
+        const text =
+          item.status === "due"
+          ? t("dueStatus")
+          : item.status === "soon"
+          ? t("soonStatus")
+          : t("notDelivered");
+
+        itemsHtml += `
+
+          <div class="equipment-row">
+
+            <div class="equipment-info">
+
+              <strong>
+                ${safe(t(item.type))}
+              </strong>
+
+              <small>
+                الاستحقاق:
+                ${formatDate(
+                  item.eq?.next_due_date
+                )}
+              </small>
+
+              ${
+                item.eq?.last_date
+                ? `
+                  <small>
+                    آخر تسليم:
+                    ${formatDate(
+                      item.eq.last_date
+                    )}
+                  </small>
+                `
+                : ""
+              }
+
+            </div>
+
+            <span class="status ${statusClass}">
+              ${text}
+            </span>
+
+          </div>
+
+        `;
+
+      });
+
+      card.innerHTML = `
+
+        <h4>
+          ${safe(w.name)}
+          (${safe(w.matricule)})
+        </h4>
+
+        <div>
+          ${itemsHtml}
+        </div>
+
+      `;
+
+      box.appendChild(card);
+
+    });
+
+  document.getElementById(
+    "dueToday"
+  ).textContent = dueCount;
+
+  if(!box.children.length){
+
+    box.innerHTML =
+      `<div class="empty">
+        لا توجد استحقاقات حالياً
+      </div>`;
+
+  }
+
+}
+
+
+/* =========================================================
+   STATISTICS
+========================================================= */
+
+function statistics(){
+
+  document.getElementById(
+    "productsNumber"
+  ).textContent =
+    products.length;
+
+  const today =
+    todayKey();
+
+  let entries = 0;
+  let exits = 0;
+
+  movements.forEach(m => {
+
+    const mDate =
+      m.created_at
+      ? localDateKey(
+          new Date(m.created_at)
+        )
+      : "";
+
+    if(mDate !== today)
+      return;
+
+    if(m.type === "entry")
+      entries += Number(m.quantity)||0;
+
+    if(m.type === "exit")
+      exits += Number(m.quantity)||0;
+
+  });
+
+  document.getElementById(
+    "entryToday"
+  ).textContent = entries;
+
+  document.getElementById(
+    "exitToday"
+  ).textContent = exits;
+
+}
+
+
+/* =========================================================
+   UTILITIES
+========================================================= */
+
+function safe(str){
+
+  if(str === null ||
+     str === undefined)
+    return "";
+
+  return String(str)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+}
+
+
+function safeAttr(str){
+
+  if(str === null ||
+     str === undefined)
+    return "";
+
+  return String(str)
+    .replace(/\\/g,"\\\\")
+    .replace(/'/g,"\\'");
+}
+
+
+function toast(msg){
+
+  const el =
+    document.getElementById(
+      "toast"
+    );
+
+  el.textContent = msg;
+
+  el.classList.add("show");
+
+  clearTimeout(
+    window.toastTimer
+  );
+
+  window.toastTimer =
+    setTimeout(
+      () => {
+        el.classList.remove("show");
+      },
+      3500
+    );
+
+}
+
+
+/* =========================================================
+   SEARCH LISTENERS
+========================================================= */
+
+document
+  .getElementById("stockSearch")
+  ?.addEventListener(
+    "input",
+    renderProducts
+  );
+
+document
+  .getElementById("workerSearch")
+  ?.addEventListener(
+    "input",
+    renderWorkers
+  );
+
+document
+  .getElementById("equipmentSearch")
+  ?.addEventListener(
+    "input",
+    renderEquipment
+  );
+
+document
+  .getElementById("movementSearch")
+  ?.addEventListener(
+    "input",
+    renderMovements
+  );
+
+document
+  .getElementById("dueSearch")
+  ?.addEventListener(
+    "input",
+    renderDue
+  );
+
+document
+  .getElementById("userSearch")
+  ?.addEventListener(
+    "input",
+    renderUsers
+  );
+
+
+/* =========================================================
+   INIT
+========================================================= */
+
+setLanguage("ar");
+
+checkSession();
+
+</script>
+
+</body>
+</html>
