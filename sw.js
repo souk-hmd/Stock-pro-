@@ -2,7 +2,7 @@ const CACHE = 'stock-pro-v2.6';
 
 const ASSETS = [
   './',
-  './Stock_Pro_v2.5_Metrology.html',
+  './index.html',
   './styles.css',
   './app.js',
   './manifest.json',
@@ -35,7 +35,9 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(
     caches.match(event.request).then(cached => {
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
 
       return fetch(event.request)
         .then(response => {
@@ -47,9 +49,9 @@ self.addEventListener('fetch', event => {
 
           return response;
         })
-        .catch(() =>
-          caches.match('./Stock_Pro_v2.5_Metrology.html')
-        );
+        .catch(() => {
+          return caches.match('./index.html');
+        });
     })
   );
 });
