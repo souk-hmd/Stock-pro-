@@ -2,7 +2,7 @@
   "name": "Stock Pro",
   "short_name": "Stock Pro",
   "description": "Gestion de Stock",
-  "start_url": "./Stock_Pro_v2.5_Metrology.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#111827",
