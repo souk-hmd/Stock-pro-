@@ -45,7 +45,39 @@ function translateApp(){
 }
 function changeLanguage(lang){currentLanguage=lang;localStorage.setItem("stockpro_language",lang);document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";const ls=document.getElementById("languageSelect");if(ls)ls.value=lang;translateApp();renderProducts();renderWorkers();renderEquipment();renderDue();if(isMasterAdmin())renderUsers();updateInstallButton();}
 function isAppInstalled(){return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches||window.matchMedia("(display-mode: minimal-ui)").matches||window.navigator.standalone===true;}
-function updateInstallButton(){const installed=isAppInstalled();const home=document.getElementById("homeInstallBox");const login=document.getElementById("loginInstallButton");const settings=document.getElementById("installButton");const show=!installed&&!!deferredPrompt;if(home)home.style.display=show?"block":"none";if(login)login.style.display=show?"block":"none";if(settings)settings.style.display="none";}
+function updateInstallButton(){
+  const installed=isAppInstalled();
+  const canInstall=!!deferredPrompt;
+  const show=!installed;
+
+  const home=document.getElementById("homeInstallBox");
+  const login=document.getElementById("loginInstallButton");
+  const settings=document.getElementById("installButton");
+  const homeBtn=document.getElementById("homeInstallButton");
+  const help=document.getElementById("installHelp");
+  const loginHelp=document.getElementById("loginInstallHelp");
+
+  if(home) home.style.display=show?"block":"none";
+  if(login) login.style.display=show?"block":"none";
+  if(settings) settings.style.display=show?"block":"none";
+
+  const text=canInstall
+    ?"📲 تثبيت التطبيق"
+    :"📲 تحميل التطبيق";
+
+  if(homeBtn) homeBtn.textContent=text;
+  if(login) login.textContent=text;
+  if(settings) settings.textContent=canInstall
+    ?"📲 تثبيت Stock Pro على الهاتف"
+    :"📲 تحميل Stock Pro على الهاتف";
+
+  const helpText=canInstall
+    ?"اضغط هنا لتثبيت Stock Pro على هاتفك."
+    ?"إذا لم تظهر نافذة التثبيت، افتح قائمة المتصفح واختر «إضافة إلى الشاشة الرئيسية».";
+
+  if(help) help.textContent=helpText;
+  if(loginHelp) loginHelp.textContent=helpText;
+}
 
 async function checkSession(){const {data,error}=await db.auth.getSession();if(error){showLogin();return}if(data.session){if(await applyUser(data.session.user))await loadAll()}else showLogin()}
 function authErrorArabic(error){
@@ -523,7 +555,30 @@ async function setUserTemporary(id){
 }
 ["stockSearch","workerSearch","equipmentSearch","dueSearch","userSearch","movementSearch","metrologySearch"].forEach(id=>document.getElementById(id)?.addEventListener("input",()=>{if(id==="stockSearch")renderProducts();else if(id==="workerSearch")renderWorkers();else if(id==="equipmentSearch")renderEquipment();else if(id==="dueSearch")renderDue();else if(id==="movementSearch")renderMovementReport();else if(id==="metrologySearch")renderMetrology();else renderUsers()}));
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){if(isAppInstalled()){updateInstallButton();return}if(!deferredPrompt){updateInstallButton();return}try{await deferredPrompt.prompt();const r=await deferredPrompt.userChoice;deferredPrompt=null;updateInstallButton();if(r?.outcome==="accepted")toast("تم بدء تثبيت التطبيق ✅")}catch(e){console.warn(e);deferredPrompt=null;updateInstallButton()}}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){
+  if(isAppInstalled()){
+    updateInstallButton();
+    return;
+  }
+
+  if(!deferredPrompt){
+    updateInstallButton();
+    toast("من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية» لتثبيت التطبيق 📲");
+    return;
+  }
+
+  try{
+    await deferredPrompt.prompt();
+    const r=await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    updateInstallButton();
+    if(r?.outcome==="accepted") toast("تم بدء تثبيت التطبيق ✅");
+  }catch(e){
+    console.warn(e);
+    deferredPrompt=null;
+    updateInstallButton();
+  }
+}
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(e=>console.warn("SW:",e)));
 changeLanguage(currentLanguage);
 updateInstallButton();

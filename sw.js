@@ -1,4 +1,4 @@
-const CACHE = 'stock-pro-v2.5-final-1';
+const CACHE = 'stock-pro-v2.5-final-2';
 
 const ASSETS = [
   './',
