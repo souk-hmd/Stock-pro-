@@ -685,77 +685,14 @@ loadTheme();updateNotificationStatus();
  setTimeout(refreshAppData,1200);
 })();
 </script>
-  <!-- زر تثبيت التطبيق -->
-<button id="installAppBtn" type="button"
-  style="
-    display:none;
-    position:fixed;
-    bottom:20px;
-    left:20px;
-    z-index:99999;
-    border:0;
-    border-radius:12px;
-    padding:12px 18px;
-    background:#f5b700;
-    color:#111827;
-    font-size:15px;
-    font-weight:700;
-    cursor:pointer;
-    box-shadow:0 4px 15px rgba(0,0,0,.25);
-  ">
-  📲 تثبيت التطبيق
-</button>
 
+<!-- Stock Pro v2.5 - Install Button Only -->
+<style>
+#installAppBtnOnly{position:fixed;bottom:20px;left:20px;z-index:999999;display:block;padding:12px 18px;border:0;border-radius:12px;background:#f5b700;color:#111827;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,.3)}
+#installAppBtnOnly:active{transform:scale(.96)}
+</style>
+<button id="installAppBtnOnly" type="button">📲 تثبيت التطبيق</button>
 <script>
-(function () {
-  let deferredPrompt = null;
-  const installBtn = document.getElementById("installAppBtn");
-
-  if (!installBtn) return;
-
-  // إظهار زر التثبيت عندما يكون التطبيق قابلاً للتثبيت
-  window.addEventListener("beforeinstallprompt", function (e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = "block";
-  });
-
-  // الضغط على زر التثبيت
-  installBtn.addEventListener("click", async function () {
-    if (!deferredPrompt) {
-      alert(
-        "لتثبيت التطبيق:\n\n" +
-        "اضغط على قائمة المتصفح ⋮ ثم اختر:\n" +
-        "تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية."
-      );
-      return;
-    }
-
-    deferredPrompt.prompt();
-
-    try {
-      await deferredPrompt.userChoice;
-    } catch (e) {
-      // تجاهل الخطأ
-    }
-
-    deferredPrompt = null;
-    installBtn.style.display = "none";
-  });
-
-  // إخفاء الزر بعد تثبيت التطبيق
-  window.addEventListener("appinstalled", function () {
-    deferredPrompt = null;
-    installBtn.style.display = "none";
-  });
-
-  // إذا كان التطبيق مثبتاً أصلاً
-  if (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true
-  ) {
-    installBtn.style.display = "none";
-  }
-})();
+(function(){let deferredPrompt=null;const b=document.getElementById('installAppBtnOnly');if(!b)return;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e});b.addEventListener('click',async()=>{if(deferredPrompt){try{deferredPrompt.prompt();await deferredPrompt.userChoice}catch(e){}deferredPrompt=null}else{alert('📲 لتثبيت Stock Pro:\n\nاضغط على ⋮ في المتصفح ثم اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».')}});window.addEventListener('appinstalled',()=>{b.style.display='none'});if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true)b.style.display='none';})();
 </script>
 </body></html>
