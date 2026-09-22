@@ -1,10 +1,11 @@
 {
-  "name": "Stock Pro v2.5",
-  "short_name": "Stock Pro",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827",
-  "lang": "ar",
-  "dir": "rtl"
+  "name":"Stock Pro",
+  "short_name":"Stock Pro",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#111827",
+  "theme_color":"#111827",
+  "lang":"ar",
+  "dir":"rtl",
+  "description":"Stock Pro — Gestion de Stock & Métrologie"
 }
