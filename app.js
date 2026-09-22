@@ -12,7 +12,7 @@ function addDays(s,n){const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);r
 function safe(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;")}
 function errText(e){return e?.message||e?.error_description||"خطأ غير معروف"}
 function toast(m){const e=document.getElementById("toast");e.textContent=m;e.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove("show"),3000)}
-function showLogin(){document.getElementById("loginScreen").style.display="flex";document.getElementById("app").style.display="none";updateInstallButton()}
+function showLogin(){document.getElementById("loginScreen").style.display="flex";document.getElementById("app").style.display="none"}
 function isMasterAdmin(){return String(currentUser?.email||"").toLowerCase()===MASTER_ADMIN_EMAIL.toLowerCase()}
 function showApp(){document.getElementById("loginScreen").style.display="none";document.getElementById("app").style.display="block";const se=document.getElementById("settingsEmail");if(se)se.textContent=currentUser?.email||"";const ls=document.getElementById("languageSelect");if(ls)ls.value=currentLanguage;updateInstallButton();changeLanguage(currentLanguage);document.getElementById("adminNav").classList.toggle("show",isMasterAdmin())}
 function showLoginError(m){const e=document.getElementById("loginError");e.textContent=m;e.style.display="block"}
