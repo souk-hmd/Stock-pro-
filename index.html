@@ -172,7 +172,7 @@ function translateApp(){
 }
 function changeLanguage(lang){currentLanguage=lang;localStorage.setItem("stockpro_language",lang);document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";const ls=document.getElementById("languageSelect");if(ls)ls.value=lang;translateApp();renderProducts();renderWorkers();renderEquipment();renderDue();if(isMasterAdmin())renderUsers();updateInstallButton();}
 function isAppInstalled(){return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches||window.matchMedia("(display-mode: minimal-ui)").matches||window.navigator.standalone===true;}
-function updateInstallButton(){const installed=isAppInstalled();const home=document.getElementById("homeInstallBox");const login=document.getElementById("loginInstallButton");const settings=document.getElementById("installButton");const show=!installed&&!!deferredPrompt;if(home)home.style.display=show?"block":"none";if(login)login.style.display=show?"block":"none";if(settings)settings.style.display="none";}
+function updateInstallButton(){const installed=isAppInstalled();const home=document.getElementById("homeInstallBox");const login=document.getElementById("loginInstallButton");const settings=document.getElementById("installButton");const show=!installed;if(home)home.style.display=show?"block":"none";if(login)login.style.display=show?"block":"none";if(settings)settings.style.display="none";}
 
 async function checkSession(){const {data,error}=await db.auth.getSession();if(error){showLogin();return}if(data.session){if(await applyUser(data.session.user))await loadAll()}else showLogin()}
 function authErrorArabic(error){
@@ -684,15 +684,5 @@ loadTheme();updateNotificationStatus();
  setInterval(refreshAppData,60000);
  setTimeout(refreshAppData,1200);
 })();
-</script>
-
-<!-- Stock Pro v2.5 - Install Button Only -->
-<style>
-#installAppBtnOnly{position:fixed;bottom:20px;left:20px;z-index:999999;display:block;padding:12px 18px;border:0;border-radius:12px;background:#f5b700;color:#111827;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,.3)}
-#installAppBtnOnly:active{transform:scale(.96)}
-</style>
-<button id="installAppBtnOnly" type="button">📲 تثبيت التطبيق</button>
-<script>
-(function(){let deferredPrompt=null;const b=document.getElementById('installAppBtnOnly');if(!b)return;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e});b.addEventListener('click',async()=>{if(deferredPrompt){try{deferredPrompt.prompt();await deferredPrompt.userChoice}catch(e){}deferredPrompt=null}else{alert('📲 لتثبيت Stock Pro:\n\nاضغط على ⋮ في المتصفح ثم اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».')}});window.addEventListener('appinstalled',()=>{b.style.display='none'});if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true)b.style.display='none';})();
 </script>
 </body></html>

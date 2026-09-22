@@ -1,3 +1,4 @@
+// Stock Pro v2.5 - Workers Fixed
 const SUPABASE_URL="https://mpanymikmqajpppipmxy.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_gFcCXJ4jzWl4P8CDBi-uhQ_Gkr1EHa4";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
@@ -44,10 +45,74 @@ function translateApp(){
 }
 function changeLanguage(lang){currentLanguage=lang;localStorage.setItem("stockpro_language",lang);document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";const ls=document.getElementById("languageSelect");if(ls)ls.value=lang;translateApp();renderProducts();renderWorkers();renderEquipment();renderDue();if(isMasterAdmin())renderUsers();updateInstallButton();}
 function isAppInstalled(){return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches||window.matchMedia("(display-mode: minimal-ui)").matches||window.navigator.standalone===true;}
-function updateInstallButton(){const installed=isAppInstalled();const home=document.getElementById("homeInstallBox");const login=document.getElementById("loginInstallButton");const settings=document.getElementById("installButton");const show=!installed&&!!deferredPrompt;if(home)home.style.display=show?"block":"none";if(login)login.style.display=show?"block":"none";if(settings)settings.style.display="none";}
+function updateInstallButton(){
+  const installed=isAppInstalled();
+  const home=document.getElementById("homeInstallBox");
+  const login=document.getElementById("loginInstallButton");
+  const settings=document.getElementById("installButton");
+  const help=document.getElementById("loginInstallHelp");
+
+  // لا نستعمل زر عائم في أسفل الشاشة. نستعمل الأزرار الموجودة داخل الواجهة فقط.
+  if(installed){
+    if(home)home.style.display="none";
+    if(login)login.style.display="none";
+    if(settings)settings.style.display="none";
+    if(help)help.textContent="";
+    return;
+  }
+
+  // الزر يظهر دائماً عندما التطبيق غير مثبت، حتى لو لم يرسل المتصفح beforeinstallprompt.
+  if(home)home.style.display="block";
+  if(login)login.style.display="block";
+  if(settings)settings.style.display="none";
+  if(help){
+    help.textContent=deferredPrompt?"اضغط هنا لتثبيت التطبيق مباشرة.":"إذا لم تظهر نافذة التثبيت، افتح قائمة المتصفح ⋮ ثم اختر إضافة إلى الشاشة الرئيسية.";
+  }
+}
+
 
 async function checkSession(){const {data,error}=await db.auth.getSession();if(error){showLogin();return}if(data.session){if(await applyUser(data.session.user))await loadAll()}else showLogin()}
-async function login(e){if(e)e.preventDefault();const email=document.getElementById("loginEmail").value.trim(),password=document.getElementById("loginPassword").value,btn=document.getElementById("loginBtn");document.getElementById("loginError").style.display="none";if(!email||!password){showLoginError("أدخل البريد الإلكتروني وكلمة السر.");return}btn.disabled=true;btn.textContent="جاري الدخول...";const {data,error}=await db.auth.signInWithPassword({email,password});btn.disabled=false;btn.textContent="دخول إلى التطبيق";if(error){console.error(error);showLoginError("فشل تسجيل الدخول. تأكد من Email وكلمة السر.");return}if(!(await applyUser(data.user)))return;await loadAll();toast("تم تسجيل الدخول ✅")}
+function authErrorArabic(error){
+  const code=String(error?.code||"").toLowerCase();
+  const msg=String(error?.message||"").toLowerCase();
+  if(code.includes("invalid_credentials")||msg.includes("invalid login credentials")) return "البريد الإلكتروني أو كلمة السر غير صحيحة.";
+  if(code.includes("email_not_confirmed")||msg.includes("email not confirmed")) return "هذا البريد الإلكتروني غير مؤكد في Supabase.";
+  if(code.includes("user_not_found")||msg.includes("user not found")) return "لا يوجد حساب بهذا البريد الإلكتروني.";
+  if(code.includes("too_many_requests")||msg.includes("rate limit")) return "تم تجاوز عدد محاولات الدخول. انتظر قليلًا ثم أعد المحاولة.";
+  if(code.includes("network")||msg.includes("fetch")) return "تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.";
+  if(msg.includes("email")&&msg.includes("password")) return "البريد الإلكتروني أو كلمة السر غير صحيحة.";
+  return "تعذر تسجيل الدخول: "+(error?.message||"خطأ غير معروف");
+}
+async function login(e){
+  if(e)e.preventDefault();
+  const email=document.getElementById("loginEmail").value.trim().toLowerCase();
+  const password=document.getElementById("loginPassword").value;
+  const btn=document.getElementById("loginBtn");
+  document.getElementById("loginError").style.display="none";
+  if(!email||!password){showLoginError("أدخل البريد الإلكتروني وكلمة السر.");return}
+  btn.disabled=true;btn.textContent="جاري التحقق...";
+  try{
+    const {data,error}=await db.auth.signInWithPassword({email,password});
+    if(error){
+      console.error("Supabase login error:",error);
+      showLoginError(authErrorArabic(error));
+      return;
+    }
+    if(!data?.user){
+      showLoginError("تمت محاولة الدخول لكن لم يتم العثور على حساب المستخدم.");
+      return;
+    }
+    if(!(await applyUser(data.user)))return;
+    await loadAll();
+    toast("تم تسجيل الدخول ✅");
+  }catch(error){
+    console.error("Login exception:",error);
+    showLoginError(authErrorArabic(error));
+  }finally{
+    btn.disabled=false;
+    btn.textContent="دخول إلى التطبيق";
+  }
+}
 async function logout(){if(!confirm("هل تريد تسجيل الخروج؟"))return;await db.auth.signOut();currentUser=null;isAdmin=false;products=[];workers=[];equipment=[];metrology=[];movements=[];showLogin()}
 db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;isAdmin=false;showLogin()}else if(event==="SIGNED_IN"&&session){setTimeout(async()=>{if(await applyUser(session.user))await loadAll()},0)}});
 function showPage(id,btn){if(id==="reports")setTimeout(refreshMovementReport,0);if(id==="admin"&&!isAdmin){toast("هذه الصفحة للأدمن فقط ❌");return;}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=document.getElementById(id);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active")}
@@ -232,10 +297,73 @@ async function clearOldReports(){
 
 function openMovement(type){movementType=type;document.getElementById("movementTitle").textContent=type==="entry"?"📥 دخول المخزون":"📤 خروج المخزون";const s=document.getElementById("movementProduct");s.innerHTML="";products.forEach(p=>{const o=document.createElement("option");o.value=p.id;o.textContent=`${p.name} (${p.quantity})`;s.appendChild(o)});if(!products.length){toast("أضف منتجًا أولاً ❌");return}document.getElementById("movementQty").value=1;document.getElementById("movementNote").value="";document.getElementById("movementModal").classList.add("show")}
 async function saveMovement(e){e.preventDefault();const pid=document.getElementById("movementProduct").value,qty=Number(document.getElementById("movementQty").value),note=document.getElementById("movementNote").value.trim(),p=products.find(x=>x.id===pid);if(!p||qty<=0)return;const newQty=movementType==="entry"?Number(p.quantity||0)+qty:Number(p.quantity||0)-qty;if(newQty<0){toast("الكمية غير كافية للخروج ❌");return}const a=await db.from("movements").insert({user_id:currentUser.id,product_id:pid,product_name:p.name,type:movementType,quantity:qty,note});if(a.error){toast("تعذر تسجيل الحركة: "+errText(a.error));return}const b=await db.from("products").update({quantity:newQty}).eq("id",pid).eq("user_id",currentUser.id);if(b.error){toast("تم تسجيل الحركة لكن تعذر تحديث الكمية: "+errText(b.error));return}closeModal("movementModal");await loadProducts();await loadMovements();statistics();toast("تم تسجيل الحركة ✅")}
-async function loadWorkers(){const {data,error}=await db.from("workers").select("*").eq("user_id",currentUser.id).order("name");if(error){toast("خطأ في تحميل العمال ❌");console.error(error);return}workers=data||[];renderWorkers()}
-function renderWorkers(){const box=document.getElementById("workersList"),q=(document.getElementById("workerSearch")?.value||"").toLowerCase().trim();box.innerHTML="";workers.filter(w=>(w.name||"").toLowerCase().includes(q)||(w.matricule||"").toLowerCase().includes(q)).forEach(w=>{const d=document.createElement("div");d.className="worker";d.innerHTML=`<div class="worker-main"><div class="worker-info"><div class="worker-icon">👷</div><div><div class="worker-name">${safe(w.name)}</div><div class="worker-matricule">${safe(w.matricule)}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${safe(w.job||"")}</div></div></div><span class="worker-status ${w.status==="inactive"?"inactive":""}">${w.status==="inactive"?"غير نشط":"نشط"}</span></div><div class="product-actions"><button class="small-btn delete" onclick="deleteWorker('${safe(w.id)}')">🗑️ حذف</button></div>`;box.appendChild(d)});if(!box.children.length)box.innerHTML='<div class="info-box" style="text-align:center">لا يوجد عمال.</div>'}
+async function loadWorkers(){
+  if(!currentUser){
+    workers=[];
+    renderWorkers();
+    renderEquipment();
+    renderDue();
+    return;
+  }
+
+  const {data,error}=await db
+    .from("workers")
+    .select("*")
+    .eq("user_id",currentUser.id)
+    .order("name",{ascending:true});
+
+  if(error){
+    console.error("❌ خطأ تحميل العمال:",error);
+    toast("خطأ في تحميل العمال ❌");
+    return;
+  }
+
+  workers=data||[];
+  renderWorkers();
+  renderEquipment();
+  renderDue();
+  console.log("✅ تم تحميل العمال:",workers.length);
+}
+function renderWorkers(){
+  const box=document.getElementById("workersList");
+  if(!box)return;
+  const q=(document.getElementById("workerSearch")?.value||"").toLowerCase().trim();
+  box.innerHTML="";
+  const list=workers.filter(w=>{
+    const name=String(w.name||"").toLowerCase();
+    const matricule=String(w.matricule||"").toLowerCase();
+    const job=String(w.job||"").toLowerCase();
+    return !q||name.includes(q)||matricule.includes(q)||job.includes(q);
+  });
+  list.forEach(w=>{
+    const d=document.createElement("div");
+    d.className="worker";
+    d.innerHTML=`<div class="worker-main"><div class="worker-info"><div class="worker-icon">👷</div><div><div class="worker-name">${safe(w.name)}</div><div class="worker-matricule">${safe(w.matricule)}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${safe(w.job||"")}</div></div></div><span class="worker-status ${w.status==="inactive"?"inactive":""}">${w.status==="inactive"?"غير نشط":"نشط"}</span></div><div class="product-actions"><button class="small-btn delete" type="button" onclick="deleteWorker('${safe(w.id)}')">🗑️ حذف</button></div>`;
+    box.appendChild(d);
+  });
+  if(!box.children.length)box.innerHTML=`<div class="info-box" style="text-align:center">${q?"لا يوجد عمال مطابقون للبحث.":"لا يوجد عمال."}</div>`;
+}
 function openWorker(){document.getElementById("workerMatricule").value="";document.getElementById("workerName").value="";document.getElementById("workerRole").value="";document.getElementById("workerModal").classList.add("show")}
-async function saveWorker(e){e.preventDefault();if(!currentUser)return toast("يجب تسجيل الدخول أولاً ❌");const matricule=document.getElementById("workerMatricule").value.trim();const name=document.getElementById("workerName").value.trim();const job=document.getElementById("workerRole").value.trim();if(!matricule||!name)return toast("أدخل Matricule واسم العامل ❌");if(workers.some(w=>String(w.matricule||"").trim().toLowerCase()===matricule.toLowerCase()))return toast("هذا الـ Matricule موجود بالفعل ❌");const obj={user_id:currentUser.id,matricule,name,job,status:"active"};const {error}=await db.from("workers").insert(obj);if(error){console.error(error);return toast("تعذر إضافة العامل: "+errText(error));}closeModal("workerModal");await loadWorkers();await loadEquipment();renderDue();toast("تمت إضافة العامل ✅")}
+async function saveWorker(e){
+  e.preventDefault();
+  if(!currentUser)return toast("يجب تسجيل الدخول أولاً ❌");
+  const matricule=document.getElementById("workerMatricule").value.trim();
+  const name=document.getElementById("workerName").value.trim();
+  const job=document.getElementById("workerRole").value.trim();
+  if(!matricule||!name)return toast("أدخل Matricule واسم العامل ❌");
+  const exists=workers.some(w=>String(w.matricule||"").trim().toLowerCase()===matricule.toLowerCase());
+  if(exists)return toast("هذا الـ Matricule موجود بالفعل ❌");
+  const obj={user_id:currentUser.id,matricule,name,job,status:"active"};
+  const {error}=await db.from("workers").insert(obj);
+  if(error){console.error("❌ إضافة العامل:",error);return toast("تعذر إضافة العامل: "+errText(error));}
+  closeModal("workerModal");
+  await loadWorkers();
+  await loadEquipment();
+  renderWorkers();
+  renderEquipment();
+  renderDue();
+  toast("تمت إضافة العامل وظهر في التجهيزات مباشرة ✅");
+}
 
 async function deleteWorker(id){const w=workers.find(x=>String(x.id)===String(id));if(!w||!confirm("هل أنت متأكد من حذف العامل؟\n\n"+w.name))return;const eq=await db.from("equipment").delete().eq("worker_id",id).eq("user_id",currentUser.id);if(eq.error){console.error(eq.error);return toast("تعذر حذف تجهيزات العامل: "+errText(eq.error));}const {error}=await db.from("workers").delete().eq("id",id).eq("user_id",currentUser.id);if(error){toast("تعذر حذف العامل: "+errText(error));return}await loadWorkers();await loadEquipment();renderDue();statistics();toast("تم حذف العامل وتجهيزاته السابقة ✅")}
 async function loadEquipment(){const {data,error}=await db.from("equipment").select("*").eq("user_id",currentUser.id);if(error){toast("خطأ في تحميل التجهيزات ❌");console.error(error);return}equipment=data||[];renderEquipment();renderDue()}
@@ -264,7 +392,27 @@ function remainingText(date){
 function equipmentLabel(t){return {shoes:"حذاء حماية",bleu:"ملابس العمل",glasses:"نظارات حماية",gants:"قفازات",vest_soudeur:"سترة لحام"}[t]||t}
 function statusText(s){return s==="due"?"مستحق":s==="soon"?"قريب من الاستحقاق":s==="notdue"?"غير مستحق":"لم يُسلّم"}
 function updateEquipmentDueDate(force=true){const last=document.getElementById("equipmentDate").value;const type=document.getElementById("equipmentType").value;const due=document.getElementById("equipmentDueDate");if(last&&type&&due&&(force||!due.value))due.value=nextDue(last,type)}
-function openEquipment(){const s=document.getElementById("equipmentWorker");s.innerHTML='<option value="">اختر العامل...</option>';workers.filter(w=>w.status!=="inactive").forEach(w=>{const o=document.createElement("option");o.value=w.matricule;o.textContent=`${w.name} (${w.matricule})`;s.appendChild(o)});document.getElementById("equipmentDate").value=todayKey();document.getElementById("equipmentDueDate").value=nextDue(todayKey(),document.getElementById("equipmentType").value);document.getElementById("equipmentQty").value=1;document.getElementById("equipmentBon").value="";document.getElementById("equipmentNote").value="";s.onchange=loadExistingEquipmentForEdit;document.getElementById("equipmentType").onchange=loadExistingEquipmentForEdit;document.getElementById("equipmentDate").onchange=function(){updateEquipmentDueDate(true)};document.getElementById("equipmentModal").classList.add("show")} function loadExistingEquipmentForEdit(){const matricule=document.getElementById("equipmentWorker").value;const type=document.getElementById("equipmentType").value;const w=workers.find(x=>String(x.matricule)===String(matricule));const e=w?equipment.find(x=>String(x.worker_id)===String(w.id)&&String(x.type)===String(type)):null;if(e){document.getElementById("equipmentDate").value=e.last_date||todayKey();document.getElementById("equipmentDueDate").value=e.due_date||nextDue(document.getElementById("equipmentDate").value,type);document.getElementById("equipmentQty").value=e.quantity||1;document.getElementById("equipmentBon").value=e.bon||"";document.getElementById("equipmentNote").value=e.note||"";}else{const d=todayKey();document.getElementById("equipmentDate").value=d;document.getElementById("equipmentDueDate").value=nextDue(d,type);document.getElementById("equipmentQty").value=1;document.getElementById("equipmentBon").value="";document.getElementById("equipmentNote").value="";}}
+async function openEquipment(){
+  await loadWorkers();
+  const s=document.getElementById("equipmentWorker");
+  s.innerHTML='<option value="">اختر العامل...</option>';
+  workers.filter(w=>w.status!=="inactive").forEach(w=>{
+    const o=document.createElement("option");
+    o.value=w.matricule;
+    o.textContent=`${w.name} (${w.matricule})`;
+    s.appendChild(o);
+  });
+  document.getElementById("equipmentDate").value=todayKey();
+  document.getElementById("equipmentDueDate").value=nextDue(todayKey(),document.getElementById("equipmentType").value);
+  document.getElementById("equipmentQty").value=1;
+  document.getElementById("equipmentBon").value="";
+  document.getElementById("equipmentNote").value="";
+  s.onchange=loadExistingEquipmentForEdit;
+  document.getElementById("equipmentType").onchange=loadExistingEquipmentForEdit;
+  document.getElementById("equipmentDate").onchange=function(){updateEquipmentDueDate(true)};
+  document.getElementById("equipmentModal").classList.add("show");
+}
+ function loadExistingEquipmentForEdit(){const matricule=document.getElementById("equipmentWorker").value;const type=document.getElementById("equipmentType").value;const w=workers.find(x=>String(x.matricule)===String(matricule));const e=w?equipment.find(x=>String(x.worker_id)===String(w.id)&&String(x.type)===String(type)):null;if(e){document.getElementById("equipmentDate").value=e.last_date||todayKey();document.getElementById("equipmentDueDate").value=e.due_date||nextDue(document.getElementById("equipmentDate").value,type);document.getElementById("equipmentQty").value=e.quantity||1;document.getElementById("equipmentBon").value=e.bon||"";document.getElementById("equipmentNote").value=e.note||"";}else{const d=todayKey();document.getElementById("equipmentDate").value=d;document.getElementById("equipmentDueDate").value=nextDue(d,type);document.getElementById("equipmentQty").value=1;document.getElementById("equipmentBon").value="";document.getElementById("equipmentNote").value="";}}
 async function saveEquipment(){const matricule=document.getElementById("equipmentWorker").value;const type=document.getElementById("equipmentType").value;const last=document.getElementById("equipmentDate").value;const selectedDue=document.getElementById("equipmentDueDate").value;const qty=Math.max(1,Number(document.getElementById("equipmentQty").value)||1);if(!matricule||!last||!selectedDue)return toast("اختر العامل وتاريخ التسليم والاستحقاق القادم ❌");if(new Date(selectedDue+"T00:00:00")<new Date(last+"T00:00:00"))return toast("تاريخ الاستحقاق القادم لا يمكن أن يكون قبل تاريخ التسليم ❌");const w=workers.find(x=>String(x.matricule)===String(matricule));if(!w)return toast("العامل غير موجود ❌");const names={shoes:"حذاء حماية",bleu:"بدلة عمل",glasses:"نظارات حماية",gants:"قفازات",vest_soudeur:"سترة لحام"};const obj={user_id:currentUser.id,created_by:currentUser.id,worker_id:w.id,matricule:w.matricule,worker_name:w.name||"",type,equipment_name:names[type]||type,quantity:qty,last_date:last,due_date:selectedDue,bon:document.getElementById("equipmentBon").value.trim(),note:document.getElementById("equipmentNote").value.trim()};const existing=equipment.find(x=>String(x.worker_id)===String(w.id)&&String(x.type)===String(type));const r=existing?await db.from("equipment").update(obj).eq("id",existing.id).eq("user_id",currentUser.id):await db.from("equipment").insert(obj);if(r.error){console.error(r.error);return toast("تعذر تسجيل التجهيز: "+errText(r.error));}closeModal("equipmentModal");await loadEquipment();renderDue();statistics();toast("تم تسجيل التجهيز ✅")}
 
 function daysRemaining(date){if(!date)return null;return Math.ceil((new Date(date+"T00:00:00")-new Date(todayKey()+"T00:00:00"))/86400000)}
@@ -399,7 +547,28 @@ async function setUserTemporary(id){
 }
 ["stockSearch","workerSearch","equipmentSearch","dueSearch","userSearch","movementSearch","metrologySearch"].forEach(id=>document.getElementById(id)?.addEventListener("input",()=>{if(id==="stockSearch")renderProducts();else if(id==="workerSearch")renderWorkers();else if(id==="equipmentSearch")renderEquipment();else if(id==="dueSearch")renderDue();else if(id==="movementSearch")renderMovementReport();else if(id==="metrologySearch")renderMetrology();else renderUsers()}));
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){if(isAppInstalled()){updateInstallButton();return}if(!deferredPrompt){updateInstallButton();return}try{await deferredPrompt.prompt();const r=await deferredPrompt.userChoice;deferredPrompt=null;updateInstallButton();if(r?.outcome==="accepted")toast("تم بدء تثبيت التطبيق ✅")}catch(e){console.warn(e);deferredPrompt=null;updateInstallButton()}}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){
+  if(isAppInstalled()){updateInstallButton();return}
+  if(!deferredPrompt){
+    const help=document.getElementById("loginInstallHelp");
+    if(help){
+      help.textContent="📲 افتح قائمة المتصفح ⋮ ثم اختر «إضافة إلى الشاشة الرئيسية» أو «تثبيت التطبيق».";
+    }
+    toast("من قائمة المتصفح ⋮ اختر إضافة إلى الشاشة الرئيسية 📲");
+    return;
+  }
+  try{
+    await deferredPrompt.prompt();
+    const r=await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    updateInstallButton();
+    if(r?.outcome==="accepted")toast("تم بدء تثبيت التطبيق ✅");
+  }catch(e){
+    console.warn(e);
+    deferredPrompt=null;
+    updateInstallButton();
+  }
+}
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(e=>console.warn("SW:",e)));
 changeLanguage(currentLanguage);
 updateInstallButton();
@@ -497,7 +666,7 @@ loadTheme();updateNotificationStatus();
  async function refreshAppData(){
   try{
    show('🔄 جاري تحديث البيانات...');
-   const fns=['loadProducts','loadEmployees','loadEquipment','loadMovements','loadTransactions','renderDashboard','renderProducts','renderEquipment','renderMovements','updateDashboard','updateStats','updateTodayStats','updateDueItems'];
+   const fns=['loadProducts','loadWorkers','loadEquipment','loadMovements','loadTransactions','renderDashboard','renderProducts','renderWorkers','renderEquipment','renderMovements','updateDashboard','updateStats','updateTodayStats','updateDueItems'];
    for(const n of fns) if(typeof window[n]==='function'){try{await window[n]()}catch(e){console.warn(n,e)}}
    show('✅ تم تحديث البيانات');
   }catch(e){console.error(e);show('⚠️ تعذر تحديث بعض البيانات')}
