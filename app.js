@@ -1,1754 +1,2480 @@
 const SUPABASE_URL="https://mpanymikmqajpppipmxy.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_gFcCXJ4jzWl4P8CDBi-uhQ_Gkr1EHa4";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
 const ADMIN_EMAIL="azizsolo.190@gmail.com";
 const MASTER_ADMIN_EMAIL=ADMIN_EMAIL;
+
 let currentUser=null,isAdmin=false,products=[],workers=[],equipment=[],metrology=[],movements=[],users=[],movementType="entry",deferredPrompt=null;
 
-function safe(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function errText(e){return e?.message||e?.details||e?.hint||"خطأ غير معروف"}
 function todayKey(){return new Date().toISOString().slice(0,10)}
-function formatDate(v){if(!v)return "-";try{return new Date(v+"T00:00:00").toLocaleDateString("ar-DZ")}catch(e){return v}}
-function toast(t){const e=document.getElementById("toast");if(!e)return;clearTimeout(window.__toastTimer);e.textContent=t;e.classList.add("show");window.__toastTimer=setTimeout(()=>e.classList.remove("show"),3000)}
-function closeModal(id){document.getElementById(id)?.classList.remove("show")}
+function formatDate(d){if(!d)return "-";return new Date(d+"T00:00:00").toLocaleDateString("ar-DZ")}
+function addMonths(s,n){const d=new Date(s+"T00:00:00");d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10)}
+function addDays(s,n){const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
 
-async function login(e){
- e.preventDefault();
- const email=document.getElementById("loginEmail").value.trim();
- const password=document.getElementById("loginPassword").value;
- const btn=document.getElementById("loginBtn");
- const er=document.getElementById("loginError");
- er.style.display="none";
- btn.disabled=true;
- btn.textContent="جاري الدخول...";
- const {data,error}=await db.auth.signInWithPassword({email,password});
- btn.disabled=false;
- btn.textContent="دخول إلى التطبيق";
- if(error){
-   console.error(error);
-   er.textContent=error.message||"البريد الإلكتروني أو كلمة المرور غير صحيحة";
-   er.style.display="block";
-   return;
- }
- currentUser=data.user;
- await afterLogin();
+function safe(v){
+  return String(v??"")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/\"/g,"&quot;")
+    .replace(/'/g,"&#039;");
 }
 
-async function afterLogin(){
- document.getElementById("loginScreen").style.display="none";
- document.getElementById("app").style.display="block";
- document.getElementById("topUserEmail").textContent=currentUser?.email||"";
- await loadProfile();
- await loadAll();
- await loadUsers();
+function errText(e){
+  return e?.message||e?.error_description||"خطأ غير معروف";
 }
 
-async function loadProfile(){
- if(!currentUser)return;
- const {data,error}=await db.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();
- if(error){console.error(error);return}
- if(data){
-   isAdmin=data.role==="admin"||String(currentUser.email||"").toLowerCase()===MASTER_ADMIN_EMAIL.toLowerCase();
-   if(data.is_blocked){
-     await db.auth.signOut();
-     currentUser=null;
-     document.getElementById("app").style.display="none";
-     document.getElementById("loginScreen").style.display="flex";
-     toast("هذا الحساب موقوف ⛔");
-     return;
-   }
- }
- document.getElementById("adminNav")?.classList.toggle("show",isAdmin);
+function toast(m){
+  const e=document.getElementById("toast");
+  if(!e)return;
+  e.textContent=m;
+  e.classList.add("show");
+  clearTimeout(window.__toast);
+  window.__toast=setTimeout(()=>e.classList.remove("show"),3000);
+}
+
+function showLogin(){
+  document.getElementById("loginScreen").style.display="flex";
+  document.getElementById("app").style.display="none";
 }
 
 function isMasterAdmin(){
- return String(currentUser?.email||"").toLowerCase()===MASTER_ADMIN_EMAIL.toLowerCase();
+  return String(currentUser?.email||"").toLowerCase()===MASTER_ADMIN_EMAIL.toLowerCase();
 }
 
-async function logout(){
- await db.auth.signOut();
- currentUser=null;
- isAdmin=false;
- document.getElementById("app").style.display="none";
- document.getElementById("loginScreen").style.display="flex";
- document.getElementById("loginPassword").value="";
+function showApp(){
+  document.getElementById("loginScreen").style.display="none";
+  document.getElementById("app").style.display="block";
+
+  const se=document.getElementById("settingsEmail");
+  if(se)se.textContent=currentUser?.email||"";
+
+  const ls=document.getElementById("languageSelect");
+  if(ls)ls.value=currentLanguage;
+
+  updateInstallButton();
+  changeLanguage(currentLanguage);
+
+  const adminNav=document.getElementById("adminNav");
+  if(adminNav)adminNav.classList.toggle("show",isMasterAdmin());
 }
 
-async function loadAll(){
- await Promise.all([
-   loadProducts(),
-   loadWorkers(),
-   loadEquipment(),
-   loadMetrology(),
-   loadMovements()
- ]);
- statistics();
- renderDue();
- renderEquipment();
- renderMetrology();
- renderHomeProducts();
+function showLoginError(m){
+  const e=document.getElementById("loginError");
+  if(!e)return;
+  e.textContent=m;
+  e.style.display="block";
 }
 
-async function loadProducts(){
- if(!currentUser)return;
- const {data,error}=await db.from("products").select("*").eq("user_id",currentUser.id).order("name");
- if(error){toast("خطأ في تحميل المنتجات ❌");console.error(error);return}
- products=data||[];
- renderProducts();
- statistics();
+function togglePassword(){
+  const e=document.getElementById("loginPassword");
+  const i=document.getElementById("passwordEye");
+  if(!e)return;
+
+  e.type=e.type==="password"?"text":"password";
+  if(i)i.textContent=e.type==="password"?"👁️":"🙈";
 }
 
-function renderProducts(){
- const box=document.getElementById("productsList");
- if(!box)return;
- const q=(document.getElementById("stockSearch")?.value||"").toLowerCase().trim();
- box.innerHTML="";
- products
- .filter(p=>
-   String(p.name||"").toLowerCase().includes(q)||
-   String(p.reference||p.ref||"").toLowerCase().includes(q)
- )
- .forEach(p=>{
-   const qty=Number(p.quantity||0);
-   const min=Number(p.min_quantity??p.min_qty??0);
-   const d=document.createElement("div");
-   d.className="product";
-   d.innerHTML=`
-   <div class="product-main">
-    <div class="product-info">
-     <div class="product-icon">📦</div>
-     <div>
-      <div class="product-name">${safe(p.name)}</div>
-      <div class="product-ref">${safe(p.reference||p.ref||"")}</div>
-     </div>
-    </div>
-    <div class="quantity ${qty<=min?"low":"good"}">
-     ${qty}
-     <small>الكمية</small>
-    </div>
-   </div>
-   <div class="product-actions">
-    <button class="small-btn edit" onclick="openProduct('${safe(p.id)}')">✏️ تعديل</button>
-    <button class="small-btn delete" onclick="deleteProduct('${safe(p.id)}')">🗑️ حذف</button>
-   </div>`;
-   box.appendChild(d);
- });
- if(!box.children.length)box.innerHTML='<div class="info-box" style="text-align:center">لا توجد منتجات.</div>';
+async function getProfile(user){
+  const {data,error}=await db
+    .from("profiles")
+    .select("*")
+    .eq("id",user.id)
+    .maybeSingle();
+
+  if(error){
+    console.warn("profiles:",error.message);
+    return null;
+  }
+
+  return data;
 }
 
-function openProduct(id){
- const p=id?products.find(x=>String(x.id)===String(id)):null;
- document.getElementById("productId").value=p?.id||"";
- document.getElementById("productName").value=p?.name||"";
- document.getElementById("productRef").value=p?.reference||p?.ref||"";
- document.getElementById("productQty").value=p?.quantity??0;
- document.getElementById("productMin").value=p?.min_quantity??p?.min_qty??0;
- document.getElementById("productModal").classList.add("show");
+async function applyUser(user){
+  currentUser=user;
+
+  const p=await getProfile(user);
+
+  const temporaryExpired=
+    p?.blocked_until &&
+    new Date(p.blocked_until).getTime()<=Date.now();
+
+  if(temporaryExpired&&p?.is_blocked===true){
+    await db
+      .from("profiles")
+      .update({
+        is_blocked:false,
+        blocked_until:null
+      })
+      .eq("id",user.id);
+
+    p.is_blocked=false;
+  }
+
+  isAdmin=
+    user.email?.toLowerCase()===ADMIN_EMAIL.toLowerCase()||
+    p?.role==="admin";
+
+  if(p?.is_blocked===true||p?.blocked===true){
+    await db.auth.signOut();
+
+    currentUser=null;
+    isAdmin=false;
+
+    showLogin();
+
+    showLoginError(
+      p?.blocked_until
+      ?"هذا الحساب موقوف مؤقتًا من طرف الإدارة."
+      :"هذا الحساب محظور من طرف الإدارة."
+    );
+
+    return false;
+  }
+
+  showApp();
+
+  if(isAdmin)setTimeout(loadUsers,100);
+
+  return true;
 }
 
-async function saveProduct(e){
- e.preventDefault();
- if(!currentUser)return;
- const id=document.getElementById("productId").value;
- const obj={
-   user_id:currentUser.id,
-   name:document.getElementById("productName").value.trim(),
-   reference:document.getElementById("productRef").value.trim(),
-   quantity:Number(document.getElementById("productQty").value)||0,
-   min_quantity:Number(document.getElementById("productMin").value)||0
- };
- if(!obj.name)return toast("أدخل اسم المنتج ❌");
- let r;
- if(id)r=await db.from("products").update(obj).eq("id",id).eq("user_id",currentUser.id);
- else r=await db.from("products").insert(obj);
- if(r.error){console.error(r.error);return toast("تعذر حفظ المنتج: "+errText(r.error))}
- closeModal("productModal");
- await loadProducts();
- toast(id?"تم تعديل المنتج ✅":"تمت إضافة المنتج ✅");
-}
+let currentLanguage=
+  localStorage.getItem("stockpro_language")||"ar";
 
-async function deleteProduct(id){
- const p=products.find(x=>String(x.id)===String(id));
- if(!p||!confirm("هل أنت متأكد من حذف المنتج؟\n\n"+p.name))return;
- const {error}=await db.from("products").delete().eq("id",id).eq("user_id",currentUser.id);
- if(error)return toast("تعذر حذف المنتج: "+errText(error));
- await loadProducts();
- toast("تم حذف المنتج ✅");
-}
+const I18N={
+  ar:{
+    home:"الرئيسية",
+    products:"المنتجات",
+    workers:"العمال",
+    equipment:"التجهيزات",
+    duePage:"المستحقون",
+    reports:"التقارير",
+    settings:"الإعدادات",
+    users:"إدارة المستخدمين",
+    welcome:"مرحباً بك 👋",
+    headerTitle:"إدارة المخزون والعمال والتجهيزات",
+    quick:"العمليات السريعة",
+    addProduct:"إضافة منتج",
+    newMaterial:"مادة جديدة",
+    stockIn:"دخول المخزون",
+    stockOut:"خروج المخزون",
+    bonIn:"Bon d'entrée",
+    bonOut:"Bon de sortie",
+    issueEquipment:"تسليم تجهيز",
+    epi:"EPI / Vêtements",
+    latestProducts:"آخر المنتجات",
+    showAll:"عرض الكل",
+    searchProduct:"ابحث عن منتج أو مرجع...",
+    searchWorker:"ابحث بالـ Matricule أو الاسم...",
+    searchEquipment:"ابحث بالـ Matricule أو اسم العامل...",
+    searchDue:"ابحث بالـ Matricule أو اسم العامل...",
+    searchUser:"بحث بالاسم...",
+    add:"+ إضافة",
+    workerAdd:"+ عامل",
+    issueAdd:"+ تسليم",
+    refresh:"↻ تحديث",
+    quantity:"الكمية",
+    category:"الفئة",
+    reference:"المرجع",
+    lastIssue:"آخر تسليم",
+    dueDate:"تاريخ الاستحقاق",
+    due:"مستحق",
+    notDue:"غير مستحق",
+    soon:"قريب من الاستحقاق",
+    notIssued:"لم يُسلّم",
+    remaining:"باقي",
+    month:"شهر",
+    months:"أشهر",
+    day:"يوم",
+    days:"أيام",
+    today:"مستحق اليوم",
+    overdue:"متأخر",
+    developer:"المطور",
+    account:"👤 الحساب",
+    logout:"🚪 تسجيل الخروج",
+    language:"لغة التطبيق",
+    currentAccount:"الحساب الحالي",
+    developerTitle:"👨‍💻 المطور",
+    active:"نشط",
+    inactive:"غير نشط",
+    admin:"ADMIN",
+    worker:"WORKER",
+    blocked:"موقوف",
+    noData:"لا توجد بيانات.",
+    noProducts:"لا توجد منتجات.",
+    noWorkers:"لا يوجد عمال.",
+    noEquipment:"لا توجد بيانات تجهيزات.",
+    noDue:"لا توجد استحقاقات حالياً."
+  },
 
-async function loadWorkers(){
- if(!currentUser){
-  workers=[];
+  fr:{
+    home:"Accueil",
+    products:"Articles",
+    workers:"Travailleurs",
+    equipment:"Équipements",
+    duePage:"Éligibilités",
+    reports:"Rapports",
+    settings:"Paramètres",
+    users:"Gestion des utilisateurs",
+    welcome:"Bienvenue 👋",
+    headerTitle:"Gestion du stock, des travailleurs et des équipements",
+    quick:"Actions rapides",
+    addProduct:"Ajouter un article",
+    newMaterial:"Nouvelle matière",
+    stockIn:"Entrée stock",
+    stockOut:"Sortie stock",
+    bonIn:"Bon d'entrée",
+    bonOut:"Bon de sortie",
+    issueEquipment:"Remise équipement",
+    epi:"EPI / Vêtements",
+    latestProducts:"Derniers articles",
+    showAll:"Tout afficher",
+    searchProduct:"Rechercher un article ou une référence...",
+    searchWorker:"Rechercher par matricule ou nom...",
+    searchEquipment:"Rechercher par matricule ou nom...",
+    searchDue:"Rechercher par matricule ou nom...",
+    searchUser:"Rechercher par nom...",
+    add:"+ Ajouter",
+    workerAdd:"+ Travailleur",
+    issueAdd:"+ Remise",
+    refresh:"↻ Actualiser",
+    quantity:"Quantité",
+    category:"Famille",
+    reference:"Référence",
+    lastIssue:"Dernière remise",
+    dueDate:"Date d'échéance",
+    due:"Éligible",
+    notDue:"Non éligible",
+    soon:"Échéance proche",
+    notIssued:"Non remis",
+    remaining:"Reste",
+    month:"mois",
+    months:"mois",
+    day:"jour",
+    days:"jours",
+    today:"Éligible aujourd'hui",
+    overdue:"En retard",
+    developer:"Développeur",
+    account:"👤 Compte",
+    logout:"🚪 Déconnexion",
+    language:"Langue de l'application",
+    currentAccount:"Compte actuel",
+    developerTitle:"👨‍💻 Développeur",
+    active:"Actif",
+    inactive:"Inactif",
+    admin:"ADMIN",
+    worker:"TRAVAILLEUR",
+    blocked:"Suspendu",
+    noData:"Aucune donnée.",
+    noProducts:"Aucun article.",
+    noWorkers:"Aucun travailleur.",
+    noEquipment:"Aucun équipement.",
+    noDue:"Aucune échéance actuellement."
+  },
+
+  en:{
+    home:"Home",
+    products:"Products",
+    workers:"Workers",
+    equipment:"Equipment",
+    duePage:"Due items",
+    reports:"Reports",
+    settings:"Settings",
+    users:"User management",
+    welcome:"Welcome 👋",
+    headerTitle:"Stock, workers and equipment management",
+    quick:"Quick actions",
+    addProduct:"Add product",
+    newMaterial:"New material",
+    stockIn:"Stock entry",
+    stockOut:"Stock exit",
+    bonIn:"Entry voucher",
+    bonOut:"Exit voucher",
+    issueEquipment:"Issue equipment",
+    epi:"PPE / Clothing",
+    latestProducts:"Latest products",
+    showAll:"Show all",
+    searchProduct:"Search product or reference...",
+    searchWorker:"Search by matricule or name...",
+    searchEquipment:"Search by matricule or worker name...",
+    searchDue:"Search by matricule or worker name...",
+    searchUser:"Search by name...",
+    add:"+ Add",
+    workerAdd:"+ Worker",
+    issueAdd:"+ Issue",
+    refresh:"↻ Refresh",
+    quantity:"Quantity",
+    category:"Family",
+    reference:"Reference",
+    lastIssue:"Last issue",
+    dueDate:"Due date",
+    due:"Due",
+    notDue:"Not due",
+    soon:"Due soon",
+    notIssued:"Not issued",
+    remaining:"
+     function changeLanguage(lang){
+  if(!I18N[lang])lang="ar";
+
+  currentLanguage=lang;
+  localStorage.setItem("stockpro_language",lang);
+
+  document.documentElement.lang=lang;
+  document.documentElement.dir=lang==="ar"?"rtl":"ltr";
+
+  translateApp();
+
+  const ls=document.getElementById("languageSelect");
+  if(ls)ls.value=lang;
+
+  renderProducts();
   renderWorkers();
   renderEquipment();
   renderDue();
-  return;
- }
-
- const {data,error}=await db
-  .from("workers")
-  .select("*")
-  .eq("user_id",currentUser.id)
-  .order("name",{ascending:true});
-
- if(error){
-  console.error("❌ خطأ تحميل العمال:",error);
-  toast("خطأ في تحميل العمال ❌");
-  return;
- }
-
- workers=data||[];
-
- renderWorkers();
- renderEquipment();
- renderDue();
-
- console.log("✅ تم تحميل العمال:",workers.length);
+  renderMovements();
+  renderUsers();
 }
 
-function renderWorkers(){
- const box=document.getElementById("workersList");
- if(!box)return;
-
- const q=(document.getElementById("workerSearch")?.value||"").toLowerCase().trim();
-
- box.innerHTML="";
-
- workers
- .filter(w=>
-   (w.name||"").toLowerCase().includes(q)||
-   (w.matricule||"").toLowerCase().includes(q)
- )
- .forEach(w=>{
-   const d=document.createElement("div");
-   d.className="worker";
-
-   d.innerHTML=`
-   <div class="worker-main">
-    <div class="worker-info">
-     <div class="worker-icon">👷</div>
-     <div>
-      <div class="worker-name">${safe(w.name)}</div>
-      <div class="worker-matricule">${safe(w.matricule)}</div>
-      <div style="font-size:11px;color:#6b7280;margin-top:4px">${safe(w.job||"")}</div>
-     </div>
-    </div>
-    <span class="worker-status ${w.status==="inactive"?"inactive":""}">
-     ${w.status==="inactive"?"غير نشط":"نشط"}
-    </span>
-   </div>
-   <div class="product-actions">
-    <button class="small-btn delete" onclick="deleteWorker('${safe(w.id)}')">🗑️ حذف</button>
-   </div>`;
-
-   box.appendChild(d);
- });
-
- if(!box.children.length)
-  box.innerHTML='<div class="info-box" style="text-align:center">لا يوجد عمال.</div>';
+function openModal(id){
+  const e=document.getElementById(id);
+  if(e)e.classList.add("show");
 }
 
-function openWorker(){
- document.getElementById("workerMatricule").value="";
- document.getElementById("workerName").value="";
- document.getElementById("workerRole").value="";
- document.getElementById("workerModal").classList.add("show");
+function closeModal(id){
+  const e=document.getElementById(id);
+  if(e)e.classList.remove("show");
 }
 
-async function saveWorker(e){
- e.preventDefault();
-
- if(!currentUser)
-  return toast("يجب تسجيل الدخول أولاً ❌");
-
- const matricule=document.getElementById("workerMatricule").value.trim();
- const name=document.getElementById("workerName").value.trim();
- const job=document.getElementById("workerRole").value.trim();
-
- if(!matricule||!name)
-  return toast("أدخل Matricule واسم العامل ❌");
-
- const exists=workers.some(w =>
-  String(w.matricule||"").trim().toLowerCase()===matricule.toLowerCase()
- );
-
- if(exists)
-  return toast("هذا الـ Matricule موجود بالفعل ❌");
-
- const obj={
-  user_id:currentUser.id,
-  matricule,
-  name,
-  job,
-  status:"active"
- };
-
- const {error}=await db
-  .from("workers")
-  .insert(obj);
-
- if(error){
-  console.error("❌ إضافة العامل:",error);
-  return toast("تعذر إضافة العامل: "+errText(error));
- }
-
- closeModal("workerModal");
-
- await loadWorkers();
- await loadEquipment();
-
- renderWorkers();
- renderEquipment();
- renderDue();
-
- toast("تمت إضافة العامل وظهر في التجهيزات مباشرة ✅");
+function closeAllModals(){
+  document.querySelectorAll(".modal").forEach(e=>{
+    e.classList.remove("show");
+  });
 }
 
-async function deleteWorker(id){
- const w=workers.find(x=>String(x.id)===String(id));
+function go(page){
+  document.querySelectorAll(".page").forEach(e=>{
+    e.classList.remove("active");
+  });
 
- if(!w||!confirm("هل أنت متأكد من حذف العامل؟\n\n"+w.name))
-  return;
+  document.querySelectorAll(".nav-item").forEach(e=>{
+    e.classList.remove("active");
+  });
 
- const eq=await db
-  .from("equipment")
-  .delete()
-  .eq("worker_id",id)
-  .eq("user_id",currentUser.id);
+  const p=document.getElementById("page-"+page);
 
- if(eq.error){
-  console.error(eq.error);
-  return toast("تعذر حذف تجهيزات العامل: "+errText(eq.error));
- }
+  if(p)p.classList.add("active");
 
- const {error}=await db
-  .from("workers")
-  .delete()
-  .eq("id",id)
-  .eq("user_id",currentUser.id);
+  const nav=document.querySelector(
+    `.nav-item[data-page="${page}"]`
+  );
 
- if(error){
-  toast("تعذر حذف العامل: "+errText(error));
-  return;
- }
+  if(nav)nav.classList.add("active");
 
- await loadWorkers();
- await loadEquipment();
+  if(page==="home"){
+    loadProducts();
+    loadWorkers();
+    loadEquipment();
+    loadMovements();
+  }
 
- renderDue();
- statistics();
+  if(page==="products")
+    loadProducts();
 
- toast("تم حذف العامل وتجهيزاته السابقة ✅");
+  if(page==="workers")
+    loadWorkers();
+
+  if(page==="equipment")
+    loadEquipment();
+
+  if(page==="due"){
+    loadWorkers();
+    loadEquipment();
+  }
+
+  if(page==="reports"){
+    loadMovements();
+    loadProducts();
+  }
+
+  if(page==="admin"&&is
+     /* =========================
+   EQUIPMENT
+========================= */
+
+const EQUIPMENT_TYPES=[
+  {
+    key:"shoes",
+    label:"حذاء حماية",
+    cycle:12,
+    unit:"months"
+  },
+  {
+    key:"bleu",
+    label:"Bleu de travail",
+    cycle:6,
+    unit:"months"
+  },
+  {
+    key:"glasses",
+    label:"نظارات حماية",
+    cycle:6,
+    unit:"months"
+  },
+  {
+    key:"gants",
+    label:"قفازات",
+    cycle:35,
+    unit:"days"
+  },
+  {
+    key:"vest_soudeur",
+    label:"سترة لحام",
+    cycle:6,
+    unit:"months"
+  }
+];
+
+function getEquipmentType(key){
+  return EQUIPMENT_TYPES.find(
+    x=>x.key===key
+  );
+}
+
+function calculateDueDate(issueDate,type){
+  if(!issueDate||!type)return null;
+
+  if(type.unit==="days")
+    return addDays(issueDate,type.cycle);
+
+  return addMonths(issueDate,type.cycle);
 }
 
 async function loadEquipment(){
- if(!currentUser)return;
+  if(!currentUser){
+    equipment=[];
+    renderEquipment();
+    renderDue();
+    return false;
+  }
 
- const {data,error}=await db
-  .from("equipment")
-  .select("*")
-  .eq("user_id",currentUser.id);
+  const {data,error}=await db
+    .from("equipment")
+    .select("*")
+    .eq("user_id",currentUser.id)
+    .order("issue_date",{ascending:false});
 
- if(error){
-  toast("خطأ في تحميل التجهيزات ❌");
-  console.error(error);
-  return;
- }
+  if(error){
+    console.error("❌ تحميل التجهيزات:",error);
+    toast("خطأ في تحميل التجهيزات ❌: "+errText(error));
+    return false;
+  }
 
- equipment=data||[];
+  equipment=Array.isArray(data)?data:[];
 
- renderEquipment();
- renderDue();
+  renderEquipment();
+  renderDue();
+
+  return true;
 }
 
-function interval(t){
- return t==="shoes"?{m:12,d:0}:
-        t==="bleu"?{m:6,d:0}:
-        t==="glasses"?{m:6,d:0}:
-        t==="gants"?{m:0,d:35}:
-        {m:6,d:0};
-}
-
-function nextDue(date,type){
- const d=new Date(date+"T00:00:00");
- const x=interval(type);
- if(x.m)d.setMonth(d.getMonth()+x.m);
- if(x.d)d.setDate(d.getDate()+x.d);
- return d.toISOString().slice(0,10);
-}
-
-function dueStatus(date){
- if(!date)return"none";
-
- const now=new Date();
- now.setHours(0,0,0,0);
-
- const d=new Date(date+"T00:00:00");
- const diff=Math.ceil((d-now)/86400000);
-
- if(diff<0)return"due";
- if(diff<=30)return"soon";
- return"notdue";
-}
-
-function remainingText(date){
- if(!date)return"لم يُسلّم";
-
- const now=new Date();
- now.setHours(0,0,0,0);
-
- const d=new Date(date+"T00:00:00");
- const diff=Math.ceil((d-now)/86400000);
-
- if(diff<0)return`متأخر بـ ${Math.abs(diff)} يوم`;
- if(diff===0)return"مستحق اليوم";
- if(diff===1)return"باقي يوم واحد";
- return`باقي ${diff} يوم`;
-}
-
-function equipmentLabel(t){
- return t==="shoes"?"أحذية السلامة":
-        t==="bleu"?"ملابس العمل":
-        t==="glasses"?"نظارات السلامة":
-        t==="gants"?"القفازات":
-        "سترة اللحام";
-}
-
-function statusText(s){
- return s==="due"?"مستحق":
-        s==="soon"?"قريب":
-        s==="notdue"?"غير مستحق":
-        "لم يُسلّم";
-}
-
-async function openEquipment(){
-
- await loadWorkers();
-
- const s=document.getElementById("equipmentWorker");
-
- s.innerHTML='<option value="">اختر العامل...</option>';
-
- workers
- .filter(w=>w.status!=="inactive")
- .forEach(w=>{
-  const o=document.createElement("option");
-
-  o.value=w.matricule;
-  o.textContent=`${w.name} (${w.matricule})`;
-
-  s.appendChild(o);
- });
-
- document.getElementById("equipmentDate").value=todayKey();
-
- document.getElementById("equipmentDueDate").value=
-  nextDue(
-   todayKey(),
-   document.getElementById("equipmentType").value
+function getEquipmentWorker(id){
+  return workers.find(
+    w=>String(w.id)===String(id)
   );
-
- document.getElementById("equipmentQty").value=1;
- document.getElementById("equipmentBon").value="";
- document.getElementById("equipmentNote").value="";
-
- s.onchange=loadExistingEquipmentForEdit;
-
- document.getElementById("equipmentType").onchange=
-  loadExistingEquipmentForEdit;
-
- document.getElementById("equipmentDate").onchange=function(){
-  updateEquipmentDueDate(true);
- };
-
- document.getElementById("equipmentModal").classList.add("show");
 }
 
-function loadExistingEquipmentForEdit(){
- const matricule=document.getElementById("equipmentWorker").value;
- const type=document.getElementById("equipmentType").value;
+function getEquipmentStatus(dueDate){
+  if(!dueDate)
+    return "notIssued";
 
- const w=workers.find(x=>String(x.matricule)===String(matricule));
+  const diff=dueDiffDays(dueDate);
 
- const e=w?
-  equipment.find(x=>
-   String(x.worker_id)===String(w.id)&&
-   String(x.type)===String(type)
-  ):null;
+  if(diff<=0)
+    return "due";
 
- if(e){
-  document.getElementById("equipmentDate").value=
-   e.last_date||todayKey();
+  if(diff<=30)
+    return "soon";
 
-  document.getElementById("equipmentDueDate").value=
-   e.due_date||
-   nextDue(
-    document.getElementById("equipmentDate").value,
-    type
-   );
-
-  document.getElementById("equipmentQty").value=e.quantity||1;
-  document.getElementById("equipmentBon").value=e.bon||"";
-  document.getElementById("equipmentNote").value=e.note||"";
- }else{
-  const d=todayKey();
-
-  document.getElementById("equipmentDate").value=d;
-
-  document.getElementById("equipmentDueDate").value=
-   nextDue(d,type);
-
-  document.getElementById("equipmentQty").value=1;
-  document.getElementById("equipmentBon").value="";
-  document.getElementById("equipmentNote").value="";
- }
-}
-
-async function saveEquipment(e){
- e.preventDefault();
-
- if(!currentUser)
-  return toast("يجب تسجيل الدخول أولاً ❌");
-
- const matricule=document.getElementById("equipmentWorker").value;
- const type=document.getElementById("equipmentType").value;
- const date=document.getElementById("equipmentDate").value;
- const due=document.getElementById("equipmentDueDate").value;
- const quantity=Number(document.getElementById("equipmentQty").value)||1;
- const bon=document.getElementById("equipmentBon").value.trim();
- const note=document.getElementById("equipmentNote").value.trim();
-
- if(!matricule||!type)
-  return toast("اختر العامل ونوع التجهيز ❌");
-
- const w=workers.find(x=>String(x.matricule)===String(matricule));
-
- if(!w)
-  return toast("العامل غير موجود ❌");
-
- const existing=equipment.find(x=>
-  String(x.worker_id)===String(w.id)&&
-  String(x.type)===String(type)
- );
-
- const obj={
-  user_id:currentUser.id,
-  worker_id:w.id,
-  type,
-  last_date:date,
-  due_date:due,
-  quantity,
-  bon,
-  note
- };
-
- let r;
-
- if(existing){
-  r=await db
-   .from("equipment")
-   .update(obj)
-   .eq("id",existing.id)
-   .eq("user_id",currentUser.id);
- }else{
-  r=await db
-   .from("equipment")
-   .insert(obj);
- }
-
- if(r.error){
-  console.error(r.error);
-  return toast("تعذر حفظ التجهيز: "+errText(r.error));
- }
-
- closeModal("equipmentModal");
-
- await loadEquipment();
-
- toast(existing?"تم تحديث التجهيز ✅":"تم تسجيل التجهيز ✅");
-}
-
-function updateEquipmentDueDate(force){
- const date=document.getElementById("equipmentDate").value;
- const type=document.getElementById("equipmentType").value;
-
- if(date&&type)
-  document.getElementById("equipmentDueDate").value=
-   nextDue(date,type);
+  return "notdue";
 }
 
 function renderEquipment(){
- const box=document.getElementById("equipmentList");
- if(!box)return;
+  const box=document.getElementById("equipmentList");
+  if(!box)return;
 
- const q=(document.getElementById("equipmentSearch")?.value||"")
-  .toLowerCase()
-  .trim();
+  const search=
+    document.getElementById("equipmentSearch")
+      ?.value.trim().toLowerCase()||"";
 
- box.innerHTML="";
+  const list=equipment.filter(e=>{
+    const w=getEquipmentWorker(e.worker_id);
 
- workers
- .filter(w=>
-  (w.name||"").toLowerCase().includes(q)||
-  (w.matricule||"").toLowerCase().includes(q)
- )
- .forEach(w=>{
-
-  let rows="";
-
-  ["shoes","bleu","glasses","gants","vest_soudeur"]
-  .forEach(t=>{
-
-   const e=equipment.find(x=>
-    String(x.worker_id)===String(w.id)&&
-    x.type===t
-   );
-
-   const s=e?dueStatus(e.due_date):"none";
-   const txt=e?remainingText(e.due_date):"لم يُسلّم";
-
-   rows+=`
-   <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #eee">
-    <div>
-     <b>${equipmentLabel(t)}</b>
-     <div class="equipment-duration">آخر تسليم: ${formatDate(e?.last_date)}</div>
-     <div class="equipment-duration">تاريخ الاستحقاق: ${formatDate(e?.due_date)}</div>
-     <div style="font-weight:bold;margin-top:3px" class="equip-state-${s}">
-      ${txt}
-     </div>
-    </div>
-    <span class="status status-${s}">
-     ${statusText(s)}
-    </span>
-   </div>`;
+    return !search||
+      String(w?.name||"")
+        .toLowerCase()
+        .includes(search)||
+      String(w?.matricule||"")
+        .toLowerCase()
+        .includes(search)||
+      String(e.type||"")
+        .toLowerCase()
+        .includes(search);
   });
 
-  const d=document.createElement("div");
-  d.className="equipment";
+  if(!list.length){
+    box.innerHTML=`
+      <div class="empty">
+        ${tr("noEquipment")}
+      </div>
+    `;
+    return;
+  }
 
-  d.innerHTML=`
-  <div class="equipment-top">
-   <div class="equipment-info">
-    <div class="equipment-icon">👕</div>
-    <div>
-     <div class="equipment-name">${safe(w.name)}</div>
-     <div class="worker-matricule">${safe(w.matricule)}</div>
-    </div>
-   </div>
-  </div>
-  <div style="margin-top:10px">${rows}</div>`;
+  box.innerHTML=list.map(e=>{
 
-  box.appendChild(d);
- });
+    const w=getEquipmentWorker(e.worker_id);
 
- if(!box.children.length)
-  box.innerHTML='<div class="info-box" style="text-align:center">لا توجد بيانات تجهيزات.</div>';
+    const status=getEquipmentStatus(
+      e.due_date
+    );
+
+    return `
+      <div class="data-card">
+
+        <div class="data-main">
+
+          <strong>
+            ${safe(
+              w?.name||
+              "عامل غير موجود"
+            )}
+          </strong>
+
+          <small>
+            Matricule:
+            ${safe(w?.matricule||"-")}
+          </small>
+
+          <small>
+            ${safe(
+              equipmentLabel(e.type)
+            )}
+          </small>
+
+        </div>
+
+        <div class="data-main">
+
+          <small>
+            ${tr("lastIssue")}:
+            ${formatDate(e.issue_date)}
+          </small>
+
+          <small>
+            ${tr("dueDate")}:
+            ${formatDate(e.due_date)}
+          </small>
+
+          <small>
+            ${remainingText(e.due_date)}
+          </small>
+
+        </div>
+
+        <div>
+          <span class="badge ${
+            status==="due"
+            ?"danger"
+            :status==="soon"
+            ?"warning"
+            :"success"
+          }">
+            ${statusText(status)}
+          </span>
+        </div>
+
+        <div class="data-actions">
+
+          <button
+            class="btn btn-danger"
+            onclick="deleteEquipment('${safe(e.id)}')">
+            🗑️
+          </button>
+
+        </div>
+
+      </div>
+    `;
+  }).join("");
 }
 
 function renderDue(){
- const box=document.getElementById("dueList");
- if(!box)return;
-
- const q=(document.getElementById("dueSearch")?.value||"")
-  .toLowerCase()
-  .trim();
-
- box.innerHTML="";
-
- let count=0;
-
- workers
- .filter(w=>w.status!=="inactive")
- .forEach(w=>{
-
-  if(
-   q&&
-   !(`${w.name||""} ${w.matricule||""}`)
-    .toLowerCase()
-    .includes(q)
-  )return;
-
-  let rows="";
-
-  ["shoes","bleu","glasses","gants","vest_soudeur"]
-  .forEach(t=>{
-
-   const e=equipment.find(x=>
-    String(x.worker_id)===String(w.id)&&
-    x.type===t
-   );
-
-   const s=e?dueStatus(e.due_date):"none";
-
-   if(s==="due")count++;
-
-   const txt=e?remainingText(e.due_date):"لم يُسلّم";
-
-   rows+=`
-   <div style="padding:9px 0;border-bottom:1px solid #eee">
-    <b>${equipmentLabel(t)}</b>
-    <div class="equipment-duration">آخر تسليم: ${formatDate(e?.last_date)}</div>
-    <div class="equipment-duration">تاريخ الاستحقاق: ${formatDate(e?.due_date)}</div>
-    <div style="font-weight:bold" class="equip-state-${s}">
-     ${txt}
-    </div>
-    <span class="status status-${s}" style="display:inline-block;margin-top:5px">
-     ${statusText(s)}
-    </span>
-   </div>`;
-  });
-
-  if(rows){
-   const d=document.createElement("div");
-   d.className="equipment";
-
-   d.innerHTML=`
-   <div class="worker-name">
-    ${safe(w.name)}
-    <small>(${safe(w.matricule)})</small>
-   </div>
-   <div style="margin-top:8px">${rows}</div>`;
-
-   box.appendChild(d);
-  }
- });
-
- const today=document.getElementById("dueToday");
- if(today)today.textContent=count;
-
- if(!box.children.length)
-  box.innerHTML='<div class="info-box" style="text-align:center">لا توجد استحقاقات حالياً.</div>';
-}
-
-function statistics(){
- const p=document.getElementById("productsNumber");
- if(p)p.textContent=products.length;
-
- let en=0,ex=0,t=todayKey();
-
- movements.forEach(m=>{
-  if((m.created_at||"").slice(0,10)===t){
-   if(m.type==="entry")en+=Number(m.quantity)||0;
-   if(m.type==="exit")ex+=Number(m.quantity)||0;
-  }
- });
-
- const a=document.getElementById("entryToday");
- if(a)a.textContent=en;
-
- const b=document.getElementById("exitToday");
- if(b)b.textContent=ex;
-
- renderDue();
-}
-
-async function loadMovements(){
- if(!currentUser)return;
-
- const {data,error}=await db
-  .from("movements")
-  .select("*")
-  .eq("user_id",currentUser.id)
-  .order("created_at",{ascending:false});
-
- if(error){
-  console.error(error);
-  return;
- }
-
- movements=data||[];
- renderMovements();
- statistics();
-}
-
-function renderMovements(){
- const box=document.getElementById("movementsList");
- if(!box)return;
-
- const q=(document.getElementById("movementSearch")?.value||"")
-  .toLowerCase()
-  .trim();
-
- box.innerHTML="";
-
- movements
- .filter(m=>
-  `${m.type||""} ${m.bon||""} ${m.note||""}`
-   .toLowerCase()
-   .includes(q)
- )
- .forEach(m=>{
-  const d=document.createElement("div");
-  d.className="product";
-
-  d.innerHTML=`
-  <div class="product-main">
-   <div>
-    <div class="product-name">
-     ${m.type==="entry"?"📥 دخول":"📤 خروج"}
-    </div>
-    <div class="product-ref">${safe(m.bon||"")}</div>
-    <div class="product-ref">${formatDate((m.created_at||"").slice(0,10))}</div>
-   </div>
-   <div class="quantity">
-    ${Number(m.quantity)||0}
-    <small>الكمية</small>
-   </div>
-  </div>`;
-
-  box.appendChild(d);
- });
-
- if(!box.children.length)
-  box.innerHTML='<div class="info-box" style="text-align:center">لا توجد حركات.</div>';
-}
-
-function openMovement(type){
- movementType=type;
-
- document.getElementById("movementType").value=type;
-
- const s=document.getElementById("movementProduct");
- s.innerHTML='<option value="">اختر المنتج...</option>';
-
- products.forEach(p=>{
-  const o=document.createElement("option");
-  o.value=p.id;
-  o.textContent=`${p.name} (${p.quantity||0})`;
-  s.appendChild(o);
- });
-
- document.getElementById("movementQty").value=1;
- document.getElementById("movementBon").value="";
- document.getElementById("movementNote").value="";
-
- document.getElementById("movementModal").classList.add("show");
-}
-
-async function saveMovement(e){
- e.preventDefault();
-
- if(!currentUser)return;
-
- const productId=document.getElementById("movementProduct").value;
- const qty=Number(document.getElementById("movementQty").value)||0;
- const bon=document.getElementById("movementBon").value.trim();
- const note=document.getElementById("movementNote").value.trim();
-
- if(!productId||qty<=0)
-  return toast("اختر المنتج والكمية ❌");
-
- const p=products.find(x=>String(x.id)===String(productId));
-
- if(!p)return toast("المنتج غير موجود ❌");
-
- const oldQty=Number(p.quantity)||0;
- const newQty=movementType==="entry"
-  ?oldQty+qty
-  :oldQty-qty;
-
- if(movementType==="exit"&&newQty<0)
-  return toast("الكمية غير كافية في المخزون ❌");
-
- const r1=await db
-  .from("products")
-  .update({quantity:newQty})
-  .eq("id",productId)
-  .eq("user_id",currentUser.id);
-
- if(r1.error)
-  return toast("تعذر تحديث المخزون: "+errText(r1.error));
-
- const r2=await db
-  .from("movements")
-  .insert({
-   user_id:currentUser.id,
-   product_id:productId,
-   type:movementType,
-   quantity:qty,
-   bon,
-   note
-  });
-
- if(r2.error){
-  console.error(r2.error);
-  await db.from("products")
-   .update({quantity:oldQty})
-   .eq("id",productId)
-   .eq("user_id",currentUser.id);
-
-  return toast("تعذر تسجيل الحركة: "+errText(r2.error));
- }
-
- closeModal("movementModal");
-
- await loadProducts();
- await loadMovements();
-
- toast("تم تسجيل الحركة ✅");
-}
-
-async function loadMetrology(){
- if(!currentUser)return;
-
- const {data,error}=await db
-  .from("metrology")
-  .select("*")
-  .eq("user_id",currentUser.id)
-  .order("name");
-
- if(error){
-  console.error(error);
-  return;
- }
-
- metrology=data||[];
- renderMetrology();
-}
-
-function metrologyDurationLabel(m){
- if(Number(m)===6)return"6 أشهر";
- if(Number(m)===12)return"سنة";
- return `${m||0} شهر`;
-}
-
-function metrologyStatus(date){
- if(!date)return"due";
-
- const now=new Date();
- now.setHours(0,0,0,0);
-
- const d=new Date(date+"T00:00:00");
- const diff=Math.ceil((d-now)/86400000);
-
- if(diff<0)return"due";
- if(diff<=30)return"soon";
- return"notdue";
-}
-
-function metrologyRemaining(date){
- if(!date)return"غير محدد";
-
- const now=new Date();
- now.setHours(0,0,0,0);
-
- const d=new Date(date+"T00:00:00");
- const diff=Math.ceil((d-now)/86400000);
-
- if(diff<0)return`منتهي منذ ${Math.abs(diff)} يوم`;
- if(diff===0)return"ينتهي اليوم";
- return`باقي ${diff} يوم`;
-}
-
-function renderMetrology(){
- const box=document.getElementById("metrologyList");
- if(!box)return;
-
- const q=(document.getElementById("metrologySearch")?.value||"")
-  .toLowerCase()
-  .trim();
-
- box.innerHTML="";
-
- let valid=0,soon=0,expired=0;
-
- const list=metrology.filter(x=>
-  `${x.name||""} ${x.reference||""} ${x.serial_number||""}`
-   .toLowerCase()
-   .includes(q)
- );
-
- list.forEach(x=>{
-  const st=metrologyStatus(x.expiry_date);
-
-  if(st==="notdue")valid++;
-  else if(st==="soon")soon++;
-  else if(st==="due")expired++;
-
-  const d=document.createElement("div");
-  d.className="equipment";
-
-  d.innerHTML=`
-  <div class="equipment-top">
-   <div class="equipment-info">
-    <div class="equipment-icon">📏</div>
-    <div>
-     <div class="equipment-name">${safe(x.name)}</div>
-     <div class="worker-matricule">
-      ${safe(x.reference||"بدون Référence")}
-      ${x.serial_number?" · S/N "+safe(x.serial_number):""}
-     </div>
-    </div>
-   </div>
-   <span class="status status-${st}">
-    ${st==="due"?"منتهي":st==="soon"?"قريب الانتهاء":"صالح"}
-   </span>
-  </div>
-
-  <div style="margin-top:10px">
-   <div class="equipment-duration">
-    📅 تاريخ الطالوناج: <b>${formatDate(x.calibration_date)}</b>
-   </div>
-   <div class="equipment-duration">
-    ⏱️ مدة الطالوناج: <b>${metrologyDurationLabel(x.calibration_duration_months)}</b>
-   </div>
-   <div class="equipment-duration">
-    📅 نهاية الطالوناج: <b>${formatDate(x.expiry_date)}</b>
-   </div>
-   <div style="font-weight:bold;margin-top:5px" class="equip-state-${st}">
-    ${metrologyRemaining(x.expiry_date)}
-   </div>
-   ${x.note?`<div class="equipment-duration">📝 ${safe(x.note)}</div>`:""}
-  </div>
-
-  <div class="product-actions" style="margin-top:10px">
-   <button class="small-btn edit" onclick="openMetrology('${safe(x.id)}')">✏️ تعديل</button>
-   <button class="small-btn delete" onclick="deleteMetrology('${safe(x.id)}')">🗑️ حذف</button>
-  </div>`;
-
-  box.appendChild(d);
- });
-
- const stats=document.getElementById("metrologyStats");
-
- if(stats)
- stats.innerHTML=`
- <div class="stat">
-  <div class="icon green">🟢</div>
-  <div><span>صالح</span><strong>${valid}</strong></div>
- </div>
- <div class="stat">
-  <div class="icon orange">🟡</div>
-  <div><span>قريب الانتهاء</span><strong>${soon}</strong></div>
- </div>
- <div class="stat">
-  <div class="icon red">🔴</div>
-  <div><span>منتهي</span><strong>${expired}</strong></div>
- </div>`;
-
- if(!box.children.length)
-  box.innerHTML='<div class="info-box" style="text-align:center">لا توجد معدات ميترولوجي مسجلة.</div>';
-}
-
-function openMetrology(id){
- const x=id?metrology.find(v=>String(v.id)===String(id)):null;
-
- document.getElementById("metrologyId").value=x?.id||"";
- document.getElementById("metrologyName").value=x?.name||"";
- document.getElementById("metrologyReference").value=x?.reference||"";
- document.getElementById("metrologySerial").value=x?.serial_number||"";
- document.getElementById("metrologyCalibrationDate").value=x?.calibration_date||todayKey();
- document.getElementById("metrologyDuration").value=x?.calibration_duration_months||12;
- document.getElementById("metrologyNote").value=x?.note||"";
-
- updateMetrologyExpiry();
-
- document.getElementById("metrologyModal").classList.add("show");
-}
-
-function updateMetrologyExpiry(){
- const d=document.getElementById("metrologyCalibrationDate").value;
- const m=Number(document.getElementById("metrologyDuration").value)||12;
-
- if(!d)return;
-
- const x=new Date(d+"T00:00:00");
- x.setMonth(x.getMonth()+m);
-
- document.getElementById("metrologyExpiry").value=
-  x.toISOString().slice(0,10);
-}
-
-async function saveMetrology(e){
- e.preventDefault();
-
- if(!currentUser)return;
-
- const id=document.getElementById("metrologyId").value;
-
- const obj={
-  user_id:currentUser.id,
-  name:document.getElementById("metrologyName").value.trim(),
-  reference:document.getElementById("metrologyReference").value.trim(),
-  serial_number:document.getElementById("metrologySerial").value.trim(),
-  calibration_date:document.getElementById("metrologyCalibrationDate").value,
-  calibration_duration_months:Number(document.getElementById("metrologyDuration").value)||12,
-  expiry_date:document.getElementById("metrologyExpiry").value,
-  note:document.getElementById("metrologyNote").value.trim()
- };
-
- if(!obj.name)
-  return toast("أدخل اسم المعدات ❌");
-
- let r;
-
- if(id){
-  r=await db
-   .from("metrology")
-   .update(obj)
-   .eq("id",id)
-   .eq("user_id",currentUser.id);
- }else{
-  r=await db.from("metrology").insert(obj);
- }
-
- if(r.error){
-  console.error(r.error);
-  return toast("تعذر حفظ المعدات: "+errText(r.error));
- }
-
- closeModal("metrologyModal");
- await loadMetrology();
-
- toast(id?"تم تعديل معدات الميترولوجي ✅":"تمت إضافة معدات الميترولوجي ✅");
-}
-
-async function deleteMetrology(id){
- if(!confirm("هل أنت متأكد من حذف هذه المعدات؟"))return;
-
- const {error}=await db
-  .from("metrology")
-  .delete()
-  .eq("id",id)
-  .eq("user_id",currentUser.id);
-
- if(error)
-  return toast("تعذر الحذف: "+errText(error));
-
- await loadMetrology();
-
- toast("تم الحذف ✅");
-}
-
-function renderHomeProducts(){
- const box=document.getElementById("homeProductsList");
- if(!box)return;
-
- box.innerHTML="";
-
- products.slice(0,5).forEach(p=>{
-  const d=document.createElement("div");
-  d.className="product";
-
-  d.innerHTML=`
-  <div class="product-main">
-   <div class="product-info">
-    <div class="product-icon">📦</div>
-    <div>
-     <div class="product-name">${safe(p.name)}</div>
-     <div class="product-ref">${safe(p.reference||"")}</div>
-    </div>
-   </div>
-   <div class="quantity">
-    ${Number(p.quantity)||0}
-    <small>الكمية</small>
-   </div>
-  </div>`;
-
-  box.appendChild(d);
- });
-
- if(!box.children.length)
-  box.innerHTML='<div class="info-box" style="text-align:center">لا توجد منتجات.</div>';
-}
-
-function showPage(id,btn){
- document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
- document.getElementById(id)?.classList.add("active");
-
- document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
- btn?.classList.add("active");
-
- if(id==="workers")loadWorkers();
- if(id==="equipment"){
-  loadWorkers();
-  loadEquipment();
- }
- if(id==="metrology")loadMetrology();
- if(id==="due"){
-  loadWorkers();
-  loadEquipment();
- }
- if(id==="admin")loadUsers();
-}
-
-function activatePage(id){
- const btn=[...document.querySelectorAll(".nav button")]
-  .find(b=>b.getAttribute("onclick")?.includes(`'${id}'`));
-
- showPage(id,btn);
-}
-
-function activateStockFilter(type){
- activatePage("stock");
-
- const input=document.getElementById("stockSearch");
- if(!input)return;
-
- if(type==="empty")input.value="";
- if(type==="low")input.value="";
-
- renderProducts();
-}
-
-function changeLanguage(lang){
- currentLanguage=lang;
- localStorage.setItem("stockpro_lang",lang);
-
- document.querySelectorAll("[data-i18n]").forEach(el=>{
-  const k=el.dataset.i18n;
-  const t={
-   home:{ar:"الرئيسية",fr:"Accueil",en:"Home"},
-   products:{ar:"المخزون",fr:"Stock",en:"Stock"},
-   workers:{ar:"العمال",fr:"Employés",en:"Workers"},
-   equipment:{ar:"التجهيزات",fr:"Équipements",en:"Equipment"},
-   duePage:{ar:"المستحقون",fr:"Échéances",en:"Due"},
-   reports:{ar:"التقارير",fr:"Rapports",en:"Reports"},
-   settings:{ar:"الإعدادات",fr:"Paramètres",en:"Settings"},
-   users:{ar:"إدارة المستخدمين",fr:"Utilisateurs",en:"Users"},
-   logout:{ar:"🚪 تسجيل الخروج",fr:"🚪 Déconnexion",en:"🚪 Logout"},
-   welcome:{ar:"مرحباً بك 👋",fr:"Bienvenue 👋",en:"Welcome 👋"},
-   headerTitle:{ar:"إدارة المخزون والعمال والتجهيزات",fr:"Gestion du stock, employés et équipements",en:"Stock, workers and equipment management"}
-  }[k];
-
-  if(t)el.textContent=t[lang]||t.ar;
- });
-
- renderWorkers();
- renderEquipment();
- renderDue();
- renderProducts();
- renderMetrology();
-}
-
-let currentLanguage=localStorage.getItem("stockpro_lang")||"ar";
-
-function togglePassword(){
- const e=document.getElementById("loginPassword");
- if(!e)return;
- e.type=e.type==="password"?"text":"password";
-}
-
-function isAppInstalled(){
- return window.matchMedia("(display-mode: standalone)").matches||
-        window.navigator.standalone===true;
-}
-
-function updateInstallButton(){
- const home=document.getElementById("homeInstallBox");
- const login=document.getElementById("loginInstallButton");
-
- if(isAppInstalled()){
-  if(home)home.style.display="none";
-  if(login)login.style.display="none";
-  return;
- }
-
- if(deferredPrompt){
-  if(home)home.style.display="block";
-  if(login)login.style.display="block";
- }
-}
-
-async function installApp(){
- if(isAppInstalled()){
-  updateInstallButton();
-  return;
- }
-
- if(!deferredPrompt){
-  updateInstallButton();
-  return;
- }
-
- try{
-  await deferredPrompt.prompt();
-
-  const r=await deferredPrompt.userChoice;
-
-  deferredPrompt=null;
-  updateInstallButton();
-
-  if(r?.outcome==="accepted")
-   toast("تم بدء تثبيت التطبيق ✅");
- }catch(e){
-  console.warn(e);
-  deferredPrompt=null;
-  updateInstallButton();
- }
-}
-
-async function loadUsers(){
- if(!isMasterAdmin())return;
-
- const {data,error}=await db
-  .from("profiles")
-  .select("id,full_name,role,created_at,is_blocked")
-  .order("full_name");
-
- if(error){
-  console.error(error);
-  toast("تعذر تحميل المستخدمين: "+errText(error));
-  return;
- }
-
- users=data||[];
- renderUsers();
-}
-
-function renderUsers(){
- const body=document.getElementById("usersList");
- const q=(document.getElementById("userSearch")?.value||"")
-  .toLowerCase()
-  .trim();
-
- if(!body)return;
-
- body.innerHTML="";
-
- users
- .filter(u=>
-  `${u.full_name||""} ${u.id||""} ${u.role||""}`
-   .toLowerCase()
-   .includes(q)
- )
- .forEach(u=>{
-
-  const admin=u.role==="admin";
-  const self=u.id===currentUser.id;
-  const blocked=!!u.is_blocked;
-
-  const tr=document.createElement("tr");
-
-  const roleText=
-   admin?
-   '<span class="admin-badge">ADMIN</span>':
-   '<span>WORKER</span>';
-
-  const state=
-   blocked?
-   '<span class="status status-notdue">موقوف</span>':
-   '<span class="status status-due">نشط</span>';
-
-  let actions="";
-
-  if(self){
-   actions='<span style="color:#6b7280;font-size:11px">حسابك — محمي</span>';
-  }else{
-   actions=`
-   <div class="v22-user-actions">
-    ${
-     admin?
-     `<button class="small-btn warning" onclick="setUserRole('${u.id}','worker')">👤 نزع الأدمن</button>`:
-     `<button class="small-btn success" onclick="setUserRole('${u.id}','admin')">👑 تعيين أدمن</button>`
-    }
-
-    ${
-     blocked?
-     `<button class="small-btn success" onclick="setUserBlocked('${u.id}',false)">✅ تفعيل</button>`:
-     `<button class="small-btn delete" onclick="setUserBlocked('${u.id}',true)">⛔ حظر</button>`
-    }
-
-    ${
-     blocked?
-     `<button class="small-btn warning" onclick="setUserTemporary('${u.id}')">⏱️ توقيف مؤقت</button>`:""
-    }
-   </div>`;
+  const box=document.getElementById("dueList");
+  if(!box)return;
+
+  const search=
+    document.getElementById("dueSearch")
+      ?.value.trim().toLowerCase()||"";
+
+  const list=equipment
+    .filter(e=>{
+      const status=getEquipmentStatus(
+        e.due_date
+      );
+
+      return status==="due"||
+             status==="soon";
+    })
+    .filter(e=>{
+      const w=getEquipmentWorker(e.worker_id);
+
+      return !search||
+        String(w?.name||"")
+          .toLowerCase()
+          .includes(search)||
+        String(w?.matricule||"")
+          .toLowerCase()
+          .includes(search)||
+        String(e.type||"")
+          .toLowerCase()
+          .includes(search);
+    })
+    .sort((a,b)=>{
+      return String(a.due_date||"")
+        .localeCompare(
+          String(b.due_date||"")
+        );
+    });
+
+  if(!list.length){
+    box.innerHTML=`
+      <div class="empty">
+        ${tr("noDue")}
+      </div>
+    `;
+    return;
   }
 
-  tr.className=blocked?"blocked":"";
+  box.innerHTML=list.map(e=>{
 
-  tr.innerHTML=`
-  <td style="direction:ltr;text-align:left;font-size:10px">${safe(u.id||"-")}</td>
-  <td>${safe(u.full_name||"بدون اسم")}</td>
-  <td>${roleText}</td>
-  <td>${state}</td>
-  <td>${actions}</td>`;
+    const w=getEquipmentWorker(e.worker_id);
 
-  body.appendChild(tr);
- });
+    const status=getEquipmentStatus(
+      e.due_date
+    );
 
- if(!body.children.length)
-  body.innerHTML='<tr><td colspan="5" style="text-align:center;padding:25px;color:#6b7280">لا توجد حسابات.</td></tr>';
+    return `
+      <div class="data-card">
+
+        <div class="data-main">
+
+          <strong>
+            ${safe(w?.name||"-")}
+          </strong>
+
+          <small>
+            Matricule:
+            ${safe(w?.matricule||"-")}
+          </small>
+
+          <small>
+            ${safe(
+              equipmentLabel(e.type)
+            )}
+          </small>
+
+        </div>
+
+        <div class="data-main">
+
+          <small>
+            ${tr("dueDate")}:
+            ${formatDate(e.due_date)}
+          </small>
+
+          <strong>
+            ${remainingText(e.due_date)}
+          </strong>
+
+        </div>
+
+        <span class="badge ${
+          status==="due"
+          ?"danger"
+          :"warning"
+        }">
+          ${statusText(status)}
+        </span>
+
+      </div>
+    `;
+  }).join("");
 }
 
-const MASTER_ADMIN_ID="";
+async function saveEquipment(e){
+  if(e)e.preventDefault();
 
-function isProtectedUser(id){
- return !id||
-        id===currentUser?.id||
-        String(currentUser?.email||"").toLowerCase()===MASTER_ADMIN_EMAIL.toLowerCase()&&
-        id===currentUser.id;
-}
+  if(!currentUser)
+    return toast("يجب تسجيل الدخول أولاً ❌");
 
-async function adminProfileUpdate(id,values,successMessage){
- if(!isMasterAdmin()||isProtectedUser(id))
-  return toast("لا يمكن تعديل حساب الأدمن الرئيسي ❌");
+  const workerId=
+    document.getElementById("equipmentWorker")
+      ?.value||"";
 
- const {error}=await db
-  .from("profiles")
-  .update(values)
-  .eq("id",id);
+  const type=
+    document.getElementById("equipmentType")
+      ?.value||"";
 
- if(error){
-  console.error(error);
-  toast("تعذر تنفيذ العملية: "+errText(error));
-  return;
- }
+  const issueDate=
+    document.getElementById("equipmentIssueDate")
+      ?.value||todayKey();
 
- await loadUsers();
+  if(!workerId)
+    return toast("اختر العامل ❌");
 
- toast(successMessage);
-}
+  if(!type)
+    return toast("اختر نوع التجهيز ❌");
 
-async function setUserRole(id,role){
- if(!isMasterAdmin()||isProtectedUser(id))return;
+  const et=getEquipmentType(type);
 
- if(!confirm(
-  role==="admin"?
-  "تعيين هذا المستخدم كأدمن؟":
-  "نزع صلاحية الأدمن من هذا المستخدم؟"
- ))return;
+  if(!et)
+    return toast("نوع التجهيز غير صحيح ❌");
 
- await adminProfileUpdate(
-  id,
-  {role},
-  role==="admin"?
-  "تم تعيينه أدمن ✅":
-  "تم نزع صلاحية الأدمن ✅"
- );
-}
+  const dueDate=
+    calculateDueDate(
+      issueDate,
+      et
+    );
 
-async function setUserBlocked(id,blocked){
- if(!isMasterAdmin()||isProtectedUser(id))return;
+  const obj={
+    user_id:currentUser.id,
+    worker_id:workerId,
+    type,
+    issue_date:issueDate,
+    due_date:dueDate
+  };
 
- if(!confirm(
-  blocked?
-  "حظر هذا الحساب؟ يمكن إعادة تفعيله لاحقًا.":
-  "إعادة تفعيل هذا الحساب؟"
- ))return;
+  const {data,error}=await db
+    .from("equipment")
+    .insert(obj)
+    .select("*")
+    .single();
 
- await adminProfileUpdate(
-  id,
-  {is_blocked:blocked},
-  blocked?
-  "تم حظر الحساب ⛔":
-  "تم تفعيل الحساب ✅"
- );
-}
+  if(error){
+    console.error(
+      "❌ إضافة التجهيز:",
+      error
+    );
 
-async function setUserTemporary(id){
- if(!isMasterAdmin()||isProtectedUser(id))return;
-
- const raw=prompt(
-  "مدة التوقيف المؤقت بالدقائق (مثال: 60):",
-  "60"
- );
-
- const mins=Number(raw);
-
- if(!Number.isFinite(mins)||mins<=0)return;
-
- const until=new Date(Date.now()+mins*60000).toISOString();
-
- const r=await db
-  .from("profiles")
-  .update({
-   is_blocked:true,
-   blocked_until:until
-  })
-  .eq("id",id);
-
- if(r.error){
-
-  const fallback=await db
-   .from("profiles")
-   .update({is_blocked:true})
-   .eq("id",id);
-
-  if(fallback.error){
-   toast("تعذر توقيف الحساب: "+errText(fallback.error));
-   return;
+    return toast(
+      "تعذر إضافة التجهيز: "+
+      errText(error)
+    );
   }
 
-  await loadUsers();
+  if(data){
+    equipment=[
+      data,
+      ...equipment.filter(
+        x=>String(x.id)!==
+           String(data.id)
+      )
+    ];
+  }
 
-  toast("تم توقيف الحساب. لإلغاء التوقيف اضغط تفعيل. ⚠️");
-  return;
- }
+  renderEquipment();
+  renderDue();
 
- await loadUsers();
+  closeModal("equipmentModal");
 
- toast(`تم توقيف الحساب لمدة ${mins} دقيقة ⏱️`);
-}
+  const w=
+    document.getElementById(
+      "equipmentWorker"
+    );
 
-[
- "stockSearch",
- "workerSearch",
- "equipmentSearch",
- "dueSearch",
- "userSearch",
- "movementSearch",
- "metrologySearch"
-].forEach(id=>{
- document.getElementById(id)?.addEventListener("input",()=>{
-  if(id==="stockSearch")renderProducts();
-  else if(id==="workerSearch")renderWorkers();
-  else if(id==="equipmentSearch")renderEquipment();
-  else if(id==="dueSearch")renderDue();
-  else if(id==="movementSearch")renderMovements();
-  else if(id==="metrologySearch")renderMetrology();
-  else renderUsers();
- });
-});
+  const t=
+    document.getElementById(
+      "equipmentType"
+    );
 
-document.querySelectorAll(".modal").forEach(m=>
- m.addEventListener("click",e=>{
-  if(e.target===m)m.classList.remove("show");
- })
-);
+  const d=
+    document.getElementById(
+      "equipmentIssueDate"
+    );
 
-window.addEventListener("beforeinstallprompt",e=>{
- e.preventDefault();
- deferredPrompt=e;
- updateInstallButton();
-});
+  if(w)w.value="";
+  if(t)t.value="";
+  if(d)d.value=todayKey();
 
-window.addEventListener("appinstalled",()=>{
- deferredPrompt=null;
- updateInstallButton();
- toast("تم تثبيت Stock Pro على الهاتف ✅");
-});
+  await loadEquipment();
 
-if("serviceWorker" in navigator)
- window.addEventListener("load",()=>
-  navigator.serviceWorker
-   .register("./sw.js")
-   .catch(e=>console.warn("SW:",e))
- );
-
-function setTheme(theme){
- const isDark=theme==="dark";
-
- document.body.classList.toggle("theme-dark",isDark);
-
- localStorage.setItem(
-  "stockpro_theme",
-  isDark?"dark":"light"
- );
-
- const meta=document.querySelector('meta[name="theme-color"]');
-
- if(meta)
-  meta.setAttribute(
-   "content",
-   isDark?"#111827":"#f3f4f6"
+  toast(
+    "تم تسجيل التجهيز بنجاح ✅"
   );
 }
 
-function loadTheme(){
- setTheme(
-  localStorage.getItem("stockpro_theme")||"light"
- );
-}
+async function deleteEquipment(id){
+  if(!currentUser)return;
 
-function smartAlertCounts(){
- let due=0,soon=0,low=0,overdue=0,empty=0;
+  if(!confirm(
+    "هل تريد حذف هذا التسليم؟"
+  ))
+    return;
 
- equipment.forEach(e=>{
-  const s=dueStatus(e.due_date);
+  const {error}=await db
+    .from("equipment")
+    .delete()
+    .eq("id",id)
+    .eq("user_id",currentUser.id);
 
-  if(s==="due")due++;
-  else if(s==="soon")soon++;
-  else if(s==="overdue")overdue++;
- });
+  if(error){
+    console.error(
+      "❌ حذف التجهيز:",
+      error
+    );
 
- products.forEach(p=>{
-  const qty=Number(p.quantity||0);
-  const min=Number(p.min_quantity??p.min_qty??0);
-
-  if(qty===0)empty++;
-  else if(min>0&&qty<=min)low++;
- });
-
- const good=products.filter(
-  p=>Number(p.quantity||0)>
-     Number(p.min_quantity??p.min_qty??0)
- ).length;
-
- return{
-  good,
-  due,
-  soon,
-  low,
-  overdue,
-  empty,
-  total:due+soon+low+overdue+empty
- };
-}
-
-function renderV22Alerts(){
- const box=document.getElementById("v22Alerts");
-
- if(!box)return;
-
- const a=smartAlertCounts();
- const lang=currentLanguage;
-
- const t=(ar,fr,en)=>
-  lang==="fr"?fr:
-  lang==="en"?en:
-  ar;
-
- box.innerHTML=`
- <div class="v22-alert ${a.due||a.overdue?"danger":""} ${a.due||a.overdue?"has-alert":""}" onclick="activatePage('due')">
-  <span class="alert-dot"></span>
-  🔴 <small>${t("استحقاقات عاجلة","Échéances urgentes","Urgent due")}</small>
-  <strong>${a.due+a.overdue}</strong>
- </div>
-
- <div class="v22-alert ${a.soon?"warning":""} ${a.soon?"has-alert":""}" onclick="activatePage('equipment')">
-  <span class="alert-dot"></span>
-  🟡 <small>${t("قريبة من الاستحقاق","Bientôt à échéance","Due soon")}</small>
-  <strong>${a.soon}</strong>
- </div>
-
- <div class="v22-alert success ${a.good?"has-alert":""}" onclick="activateStockFilter('available')">
-  <span class="alert-dot"></span>
-  🟢 <small>${t("المخزون متوفر","Stock disponible","Stock available")}</small>
-  <strong>${a.good||0}</strong>
- </div>
-
- <div class="v22-alert ${a.low?"info":""} ${a.low?"has-alert":""}" onclick="activateStockFilter('low')">
-  <span class="alert-dot"></span>
-  🔴 <small>${t("بلغ الحد الأدنى","Seuil minimum atteint","Minimum reached")}</small>
-  <strong>${a.low}</strong>
- </div>
-
- <div class="v22-alert danger ${a.empty?"has-alert":""}" onclick="activateStockFilter('empty')">
-  <span class="alert-dot"></span>
-  🚫 <small>${t("نفاذ المخزون","Rupture de stock","Out of stock")}</small>
-  <strong>${a.empty}</strong>
- </div>`;
-}
-
-async function enableSmartNotifications(){
- if(!("Notification" in window)){
-  toast("المتصفح لا يدعم التنبيهات ❌");
-  return;
- }
-
- try{
-  const p=await Notification.requestPermission();
-
-  updateNotificationStatus();
-
-  if(p==="granted"){
-   notifySmartAlerts(true);
-   toast("تم تفعيل التنبيهات الذكية 🔔");
+    return toast(
+      "تعذر حذف التجهيز: "+
+      errText(error)
+    );
   }
- }catch(e){
-  console.warn(e);
-  toast("تعذر تفعيل التنبيهات ❌");
- }
+
+  equipment=equipment.filter(
+    e=>String(e.id)!==
+       String(id)
+  );
+
+  renderEquipment();
+  renderDue();
+
+  toast("تم حذف التسليم ✅");
 }
 
-function updateNotificationStatus(){
- const e=document.getElementById("notificationStatus");
 
- if(!e)return;
+/* =========================
+   METROLOGY
+========================= */
 
- const p=
-  ("Notification" in window)?
-  Notification.permission:
-  "unsupported";
+async function loadMetrology(){
+  if(!currentUser){
+    metrology=[];
+    renderMetrology();
+    return false;
+  }
 
- e.textContent=
-  p==="granted"?
-  "حالة التنبيهات: مفعلة 🔔":
-  p==="denied"?
-  "حالة التنبيهات: محظورة من المتصفح ⛔":
-  "حالة التنبيهات: غير مفعلة";
+  const {data,error}=await db
+    .from("metrology")
+    .select("*")
+    .eq("user_id",currentUser.id)
+    .order(
+      "calibration_end",
+      {ascending:true}
+    );
+
+  if(error){
+    console.error(
+      "❌ تحميل المترولوجيا:",
+      error
+    );
+
+    toast(
+      "خطأ في تحميل الطالوناج ❌"
+    );
+
+    return false;
+  }
+
+  metrology=Array.isArray(data)?data:[];
+
+  renderMetrology();
+
+  return true;
 }
 
-function notifySmartAlerts(force=false){
- if(!("Notification" in window)||
-    Notification.permission!=="granted")return;
+function metrologyRemaining(date){
+  if(!date)
+    return tr("notIssued");
 
- const a=smartAlertCounts();
+  const diff=dueDiffDays(date);
 
- if(!a.total)return;
+  if(diff<=0){
+    return diff===0
+      ?tr("today")
+      :`${tr("overdue")} ${Math.abs(diff)} ${tr("days")}`;
+  }
 
- const key=
-  JSON.stringify({
-   d:a.due,
-   s:a.soon,
-   l:a.low,
-   e:a.empty,
-   o:a.overdue
-  })+
-  todayKey();
+  const months=Math.floor(
+    diff/30
+  );
 
- if(
-  !force&&
-  localStorage.getItem("stockpro_last_notification")===key
- )return;
+  const days=diff%30;
 
- localStorage.setItem(
-  "stockpro_last_notification",
-  key
- );
+  const parts=[];
 
- const lang=currentLanguage;
+  if(months>0){
+    parts.push(
+      `${months} ${
+        months===1
+        ?tr("month")
+        :tr("months")
+      }`
+    );
+  }
 
- const title=
-  lang==="fr"?
-  "Stock Pro — Alertes":
-  lang==="en"?
-  "Stock Pro — Alerts":
-  "Stock Pro — تنبيهات";
+  if(days>0){
+    parts.push(
+      `${days} ${
+        days===1
+        ?tr("day")
+        :tr("days")
+      }`
+    );
+  }
 
- const body=
-  lang==="fr"?
-  `Urgent: ${a.due+a.overdue} | Bientôt: ${a.soon} | Seuil minimum: ${a.low} | Rupture: ${a.empty}`:
-  lang==="en"?
-  `Urgent: ${a.due+a.overdue} | Soon: ${a.soon} | Minimum: ${a.low} | Out: ${a.empty}`:
-  `عاجل: ${a.due+a.overdue} | قريب: ${a.soon} | الحد الأدنى: ${a.low} | نفاذ: ${a.empty}`;
+  return `${tr("remaining")} ${parts.join(
+    currentLanguage==="ar"?" و ":" "
+  )}`;
+}
 
- try{
-  new Notification(title,{
-   body,
-   tag:"stock-pro-alerts"
+function renderMetrology(){
+  const box=document.getElementById(
+    "metrologyList"
+  );
+
+  if(!box)return;
+
+  if(!metrology.length){
+    box.innerHTML=`
+      <div class="empty">
+        ${tr("noData")}
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML=metrology.map(m=>{
+
+    const diff=dueDiffDays(
+      m.calibration_end
+    );
+
+    const status=
+      diff<=0
+      ?"danger"
+      :diff<=30
+      ?"warning"
+      :"success";
+
+    return `
+      <div class="data-card">
+
+        <div class="data-main">
+
+          <strong>
+            ${safe(m.equipment_name||"-")}
+          </strong>
+
+          <small>
+            ${safe(m.equipment_ref||"-")}
+          </small>
+
+          <small>
+            ${safe(m.description||"")}
+          </small>
+
+        </div>
+
+        <div class="data-main">
+
+          <small>
+            تاريخ الطالوناج:
+            ${formatDate(m.calibration_date)}
+          </small>
+
+          <small>
+            نهاية الطالوناج:
+            ${formatDate(m.calibration_end)}
+          </small>
+
+          <strong>
+            ${metrologyRemaining(
+              m.calibration_end
+            )}
+          </strong>
+
+        </div>
+
+        <span class="badge ${status}">
+          ${
+            diff<=0
+            ?tr("overdue")
+            :diff<=30
+            ?tr("soon")
+            :tr("active")
+          }
+        </span>
+
+        <div class="data-actions">
+
+          <button
+            class="btn btn-danger"
+            onclick="deleteMetrology('${safe(m.id)}')">
+            🗑️
+          </button>
+
+        </div>
+
+      </div>
+    `;
+  }).join("");
+}
+
+async function saveMetrology(e){
+  if(e)e.preventDefault();
+
+  if(!currentUser)
+    return toast(
+      "يجب تسجيل الدخول أولاً ❌"
+    );
+
+  const equipmentName=
+    document.getElementById(
+      "metrologyEquipmentName"
+    )?.value.trim()||"";
+
+  const equipmentRef=
+    document.getElementById(
+      "metrologyEquipmentRef"
+    )?.value.trim()||"";
+
+  const description=
+    document.getElementById(
+      "metrologyDescription"
+    )?.value.trim()||"";
+
+  const calibrationDate=
+    document.getElementById(
+      "calibrationDate"
+    )?.value||"";
+
+  const period=
+    Number(
+      document.getElementById(
+        "calibrationPeriod"
+      )?.value||12
+    );
+
+  const periodUnit=
+    document.getElementById(
+      "calibrationPeriodUnit"
+    )?.value||"months";
+
+  if(!equipmentName)
+    return toast(
+      "أدخل اسم جهاز القياس ❌"
+    );
+
+  if(!calibrationDate)
+    return toast(
+      "أدخل تاريخ الطالوناج ❌"
+    );
+
+  const calibrationEnd=
+    periodUnit==="days"
+    ?addDays(calibrationDate,period)
+    :addMonths(calibrationDate,period);
+
+  const obj={
+    user_id:currentUser.id,
+    equipment_name:equipmentName,
+    equipment_ref:equipmentRef,
+    description,
+    calibration_date:calibrationDate,
+    calibration_end:calibrationEnd
+  };
+
+  const {data,error}=await db
+    .from("metrology")
+    .insert(obj)
+    .select("*")
+    .single();
+
+  if(error){
+    console.error(
+      "❌ إضافة الطالوناج:",
+      error
+    );
+
+    return toast(
+      "تعذر إضافة الطالوناج: "+
+      errText(error)
+    );
+  }
+
+  if(data){
+    metrology=[
+      data,
+      ...metrology.filter(
+        x=>String(x.id)!==
+           String(data.id)
+      )
+    ];
+  }
+
+  renderMetrology();
+
+  closeModal("metrologyModal");
+
+  await loadMetrology();
+
+  toast(
+    "تم تسجيل الطالوناج بنجاح ✅"
+  );
+}
+
+async function deleteMetrology(id){
+  if(!currentUser)return;
+
+  if(!confirm(
+    "هل تريد حذف هذا الجهاز؟"
+  ))
+    return;
+
+  const {error}=await db
+    .from("metrology")
+    .delete()
+    .eq("id",id)
+    .eq("user_id",currentUser.id);
+
+  if(error){
+    console.error(
+      "❌ حذف الطالوناج:",
+      error
+    );
+
+    return toast(
+      "تعذر الحذف: "+
+      errText(error)
+    );
+  }
+
+  metrology=metrology.filter(
+    x=>String(x.id)!==
+       String(id)
+  );
+
+  renderMetrology();
+
+  toast("تم الحذف ✅");
+}
+
+
+/* =========================
+   MOVEMENTS
+========================= */
+
+async function loadMovements(){
+  if(!currentUser){
+    movements=[];
+    renderMovements();
+    return false;
+  }
+
+  const {data,error}=await db
+    .from("movements")
+    .select("*")
+    .eq("user_id",currentUser.id)
+    .order("created_at",{ascending:false});
+
+  if(error){
+    console.error(
+      "❌ تحميل الحركات:",
+      error
+    );
+
+    return false;
+  }
+
+  movements=Array.isArray(data)?data:[];
+
+  renderMovements();
+
+  return true;
+}
+
+function openMovement(productId,type){
+  movementType=type;
+
+  const select=
+    document.getElementById(
+      "movementProduct"
+    );
+
+  if(select){
+    select.innerHTML=products.map(p=>`
+      <option
+        value="${safe(p.id)}"
+        ${String(p.id)===String(productId)
+          ?"selected"
+          :""}>
+        ${safe(p.name||"-")}
+        ${
+          p.reference
+          ?" - "+safe(p.reference)
+          :""
+        }
+      </option>
+    `).join("");
+  }
+
+  const title=
+    document.getElementById(
+      "movementModalTitle"
+    );
+
+  if(title){
+    title.textContent=
+      type==="entry"
+      ?tr("stockIn")
+      :tr("stockOut");
+  }
+
+  openModal("movementModal");
+}
+
+async function saveMovement(e){
+  if(e)e.preventDefault();
+
+  if(!currentUser)
+    return toast(
+      "يجب تسجيل الدخول أولاً ❌"
+    );
+
+  const productId=
+    document.getElementById(
+      "movementProduct"
+    )?.value||"";
+
+  const qty=
+    Number(
+      document.getElementById(
+        "movementQuantity"
+      )?.value||0
+    );
+
+  const note=
+    document.getElementById(
+      "movementNote"
+    )?.value.trim()||"";
+
+  if(!productId||qty<=0)
+    return toast(
+      "أدخل المنتج والكمية ❌"
+    );
+
+  const product=products.find(
+    p=>String(p.id)===
+       String(productId)
+  );
+
+  if(!product)
+    return toast(
+      "المنتج غير موجود ❌"
+    );
+
+  const oldQty=
+    Number(product.quantity||0);
+
+  const newQty=
+    movementType==="entry"
+    ?oldQty+qty
+    :oldQty-qty;
+
+  if(newQty<0)
+    return toast(
+      "الكمية غير كافية في المخزون ❌"
+    );
+
+  const {data,error}=await db
+    .from("products")
+    .update({
+      quantity:newQty
+    })
+    .eq("id",productId)
+    .eq("user_id",currentUser.id)
+    .select("*")
+    .single();
+
+  if(error){
+    console.error(
+      "❌ تحديث المخزون:",
+      error
+    );
+
+    return toast(
+      "تعذر تحديث المخزون: "+
+      errText(error)
+    );
+  }
+
+  const movement={
+    user_id:currentUser.id,
+    product_id:productId,
+    type:movementType,
+    quantity:qty,
+    note
+  };
+
+  const result=await db
+    .from("movements")
+    .insert(movement)
+    .select("*")
+    .single();
+
+  if(result.error){
+    console.error(
+      "❌ تسجيل الحركة:",
+      result.error
+    );
+
+    return toast(
+      "تم تحديث المخزون لكن تعذر تسجيل الحركة ⚠️"
+    );
+  }
+
+  products=products.map(p=>
+    String(p.id)===String(productId)
+      ?data
+      :p
+  );
+
+  if(result.data)
+    movements=[
+      result.data,
+      ...movements
+    ];
+
+  renderProducts();
+  renderMovements();
+
+  closeModal("movementModal");
+
+  const q=
+    document.getElementById(
+      "movementQuantity"
+    );
+
+  const n=
+    document.getElementById(
+      "movementNote"
+    );
+
+  if(q)q.value="";
+  if(n)n.value="";
+
+  toast(
+    movementType==="entry"
+    ?"تم إدخال الكمية للمخزون ✅"
+    :"تم إخراج الكمية من المخزون ✅"
+  );
+}
+
+function renderMovements(){
+  const box=
+    document.getElementById(
+      "movementsList"
+    );
+
+  if(!box)return;
+
+  if(!movements.length){
+    box.innerHTML=`
+      <div class="empty">
+        ${tr("noData")}
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML=movements.map(m=>{
+
+    const p=products.find(
+      x=>String(x.id)===
+         String(m.product_id)
+    );
+
+    const isEntry=
+      m.type==="entry";
+
+    return `
+      <div class="data-card">
+
+        <div class="data-main">
+
+          <strong>
+            ${safe(p?.name||"-")}
+          </strong>
+
+          <small>
+            ${safe(p?.reference||"-")}
+          </small>
+
+          <small>
+            ${safe(m.note||"")}
+          </small>
+
+        </div>
+
+        <div>
+          <span class="badge ${
+            isEntry
+            ?"success"
+            :"danger"
+          }">
+            ${
+              isEntry
+              ?"+ "
+              :"- "
+            }${Number(m.quantity||0)}
+          </span>
+        </div>
+
+        <small>
+          ${
+            m.created_at
+            ?new Date(
+              m.created_at
+            ).toLocaleString("ar-DZ")
+            :""
+          }
+        </small>
+
+      </div>
+    `;
+  }).join("");
+}
+
+/* =========================
+   USERS / ADMIN
+========================= */
+
+async function loadUsers(){
+  if(!currentUser||!isMasterAdmin())return;
+
+  const {data,error}=await db
+    .from("profiles")
+    .select("*")
+    .order("created_at",{ascending:false});
+
+  if(error){
+    console.error("❌ تحميل المستخدمين:",error);
+    toast("تعذر تحميل المستخدمين ❌");
+    return;
+  }
+
+  users=Array.isArray(data)?data:[];
+
+  renderUsers();
+}
+
+function renderUsers(){
+  const box=document.getElementById("usersList");
+  if(!box)return;
+
+  const search=
+    document.getElementById("userSearch")
+      ?.value.trim().toLowerCase()||"";
+
+  const list=users.filter(u=>{
+    return !search||
+      String(u.name||"")
+        .toLowerCase()
+        .includes(search)||
+      String(u.email||"")
+        .toLowerCase()
+        .includes(search);
   });
- }catch(e){}
+
+  if(!list.length){
+    box.innerHTML=`
+      <div class="empty">
+        ${tr("noData")}
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML=list.map(u=>{
+
+    const master=
+      String(u.email||"").toLowerCase()===
+      MASTER_ADMIN_EMAIL.toLowerCase();
+
+    const blocked=
+      u.is_blocked===true||
+      u.blocked===true;
+
+    return `
+      <div class="data-card">
+
+        <div class="data-main">
+
+          <strong>
+            ${safe(u.name||u.email||"-")}
+          </strong>
+
+          <small>
+            ${safe(u.email||"-")}
+          </small>
+
+          <small>
+            ${safe(u.role||"worker")}
+          </small>
+
+        </div>
+
+        <div>
+
+          <span class="badge ${
+            blocked
+            ?"danger"
+            :"success"
+          }">
+            ${
+              blocked
+              ?tr("blocked")
+              :tr("active")
+            }
+          </span>
+
+        </div>
+
+        <div class="data-actions">
+
+          ${
+            master
+            ?""
+            :`
+              <button
+                class="btn ${
+                  blocked
+                  ?"btn-success"
+                  :"btn-danger"
+                }"
+                onclick="toggleUserBlock(
+                  '${safe(u.id)}',
+                  ${blocked}
+                )">
+                ${
+                  blocked
+                  ?"فتح"
+                  :"حظر"
+                }
+              </button>
+            `
+          }
+
+        </div>
+
+      </div>
+    `;
+  }).join("");
 }
 
-const _v21_statistics=statistics;
+async function toggleUserBlock(id,isBlocked){
+  if(!currentUser||!isMasterAdmin())
+    return;
 
-statistics=function(){
- _v21_statistics();
- renderV22Alerts();
- notifySmartAlerts();
-};
+  const u=users.find(
+    x=>String(x.id)===String(id)
+  );
 
-const _v21_loadAll=loadAll;
+  if(!u)return;
 
-loadAll=async function(){
- await _v21_loadAll();
- renderV22Alerts();
- notifySmartAlerts();
-};
+  if(
+    String(u.email||"").toLowerCase()===
+    MASTER_ADMIN_EMAIL.toLowerCase()
+  ){
+    return toast(
+      "لا يمكن حظر الحساب الرئيسي ❌"
+    );
+  }
 
-const _v21_changeLanguage=changeLanguage;
+  const newValue=!isBlocked;
 
-changeLanguage=function(lang){
- _v21_changeLanguage(lang);
- renderV22Alerts();
- updateNotificationStatus();
-};
+  const {error}=await db
+    .from("profiles")
+    .update({
+      is_blocked:newValue,
+      blocked:newValue
+    })
+    .eq("id",id);
 
-loadTheme();
-updateNotificationStatus();
-updateInstallButton();
+  if(error){
+    console.error(
+      "❌ تغيير حالة المستخدم:",
+      error
+    );
 
-window.addEventListener("pageshow",updateInstallButton);
+    return toast(
+      "تعذر تغيير حالة المستخدم: "+
+      errText(error)
+    );
+  }
+
+  users=users.map(x=>
+    String(x.id)===String(id)
+      ?{
+        ...x,
+        is_blocked:newValue,
+        blocked:newValue
+      }
+      :x
+  );
+
+  renderUsers();
+
+  toast(
+    newValue
+    ?"تم حظر المستخدم ✅"
+    :"تم فتح المستخدم ✅"
+  );
+}
+
+
+/* =========================
+   LOGIN
+========================= */
+
+async function login(e){
+  if(e)e.preventDefault();
+
+  const email=
+    document.getElementById(
+      "loginEmail"
+    )?.value.trim()||"";
+
+  const password=
+    document.getElementById(
+      "loginPassword"
+    )?.value||"";
+
+  if(!email||!password){
+    return showLoginError(
+      "أدخل البريد الإلكتروني وكلمة المرور."
+    );
+  }
+
+  const btn=
+    document.querySelector(
+      "#loginForm button[type='submit']"
+    );
+
+  if(btn){
+    btn.disabled=true;
+    btn.dataset.oldText=btn.textContent;
+    btn.textContent="جاري الدخول...";
+  }
+
+  const {data,error}=await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(btn){
+    btn.disabled=false;
+    btn.textContent=
+      btn.dataset.oldText||"دخول";
+  }
+
+  if(error){
+    console.error(
+      "❌ تسجيل الدخول:",
+      error
+    );
+
+    return showLoginError(
+      "البريد الإلكتروني أو كلمة المرور غير صحيحة."
+    );
+  }
+
+  if(!data?.user){
+    return showLoginError(
+      "تعذر الحصول على بيانات الحساب."
+    );
+  }
+
+  document.getElementById(
+    "loginError"
+  )?.style &&
+  (document.getElementById(
+    "loginError"
+  ).style.display="none");
+
+  await applyUser(data.user);
+
+  await loadProducts();
+  await loadWorkers();
+  await loadEquipment();
+  await loadMetrology();
+  await loadMovements();
+
+  if(isMasterAdmin())
+    await loadUsers();
+
+  go("home");
+}
+
+async function registerUser(e){
+  if(e)e.preventDefault();
+
+  const email=
+    document.getElementById(
+      "registerEmail"
+    )?.value.trim()||"";
+
+  const password=
+    document.getElementById(
+      "registerPassword"
+    )?.value||"";
+
+  const name=
+    document.getElementById(
+      "registerName"
+    )?.value.trim()||"";
+
+  if(!email||!password)
+    return toast(
+      "أدخل البريد وكلمة المرور ❌"
+    );
+
+  if(password.length<6)
+    return toast(
+      "كلمة المرور يجب أن تكون 6 أحرف على الأقل ❌"
+    );
+
+  const {data,error}=await db.auth.signUp({
+    email,
+    password
+  });
+
+  if(error){
+    console.error(
+      "❌ إنشاء الحساب:",
+      error
+    );
+
+    return toast(
+      "تعذر إنشاء الحساب: "+
+      errText(error)
+    );
+  }
+
+  if(data?.user){
+
+    const {error:profileError}=await db
+      .from("profiles")
+      .upsert({
+        id:data.user.id,
+        email,
+        name,
+        role:"worker",
+        is_blocked:false,
+        blocked:false
+      },{
+        onConflict:"id"
+      });
+
+    if(profileError){
+      console.warn(
+        "تعذر إنشاء profile:",
+        profileError
+      );
+    }
+  }
+
+  toast(
+    "تم إنشاء الحساب بنجاح. يمكنك تسجيل الدخول الآن ✅"
+  );
+
+  const reg=
+    document.getElementById("registerModal");
+
+  if(reg)
+    reg.classList.remove("show");
+}
+
+async function logout(){
+  await db.auth.signOut();
+
+  currentUser=null;
+  isAdmin=false;
+
+  products=[];
+  workers=[];
+  equipment=[];
+  metrology=[];
+  movements=[];
+  users=[];
+
+  showLogin();
+
+  toast("تم تسجيل الخروج ✅");
+}
+
+
+/* =========================
+   BACKUP / RESTORE
+========================= */
+
+async function backupData(){
+  if(!currentUser)
+    return toast(
+      "يجب تسجيل الدخول أولاً ❌"
+    );
+
+  const backup={
+    version:"2.5",
+    created_at:new Date().toISOString(),
+    user_id:currentUser.id,
+    products,
+    workers,
+    equipment,
+    metrology,
+    movements
+  };
+
+  const blob=new Blob(
+    [
+      JSON.stringify(
+        backup,
+        null,
+        2
+      )
+    ],
+    {
+      type:"application/json"
+    }
+  );
+
+  const url=
+    URL.createObjectURL(blob);
+
+  const a=document.createElement("a");
+
+  a.href=url;
+  a.download=
+    `Stock-Pro-Backup-${todayKey()}.json`;
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
+
+  toast(
+    "تم إنشاء النسخة الاحتياطية ✅"
+  );
+}
+
+function restoreData(){
+  const input=
+    document.getElementById(
+      "restoreFile"
+    );
+
+  if(input){
+    input.value="";
+    input.click();
+  }
+}
+
+async function handleRestoreFile(e){
+  const file=e.target.files?.[0];
+
+  if(!file)return;
+
+  if(!currentUser){
+    return toast(
+      "يجب تسجيل الدخول أولاً ❌"
+    );
+  }
+
+  try{
+
+    const text=
+      await file.text();
+
+    const data=
+      JSON.parse(text);
+
+    if(!data||
+       typeof data!=="object"){
+      throw new Error(
+        "ملف النسخة الاحتياطية غير صالح"
+      );
+    }
+
+    if(!confirm(
+      "استرجاع النسخة قد يضيف البيانات الموجودة في الملف. هل تريد المتابعة؟"
+    )){
+      return;
+    }
+
+    let count=0;
+
+    if(Array.isArray(data.products)){
+      for(const row of data.products){
+
+        const copy={
+          ...row,
+          user_id:currentUser.id
+        };
+
+        delete copy.id;
+        delete copy.created_at;
+        delete copy.updated_at;
+
+        const {error}=await db
+          .from("products")
+          .insert(copy);
+
+        if(!error)count++;
+      }
+    }
+
+    if(Array.isArray(data.workers)){
+      for(const row of data.workers){
+
+        const copy={
+          ...row,
+          user_id:currentUser.id
+        };
+
+        delete copy.id;
+        delete copy.created_at;
+        delete copy.updated_at;
+
+        const {error}=await db
+          .from("workers")
+          .insert(copy);
+
+        if(!error)count++;
+      }
+    }
+
+    if(Array.isArray(data.equipment)){
+      for(const row of data.equipment){
+
+        const copy={
+          ...row,
+          user_id:currentUser.id
+        };
+
+        delete copy.id;
+        delete copy.created_at;
+        delete copy.updated_at;
+
+        const {error}=await db
+          .from("equipment")
+          .insert(copy);
+
+        if(!error)count++;
+      }
+    }
+
+    if(Array.isArray(data.metrology)){
+      for(const row of data.metrology){
+
+        const copy={
+          ...row,
+          user_id:currentUser.id
+        };
+
+        delete copy.id;
+        delete copy.created_at;
+        delete copy.updated_at;
+
+        const {error}=await db
+          .from("metrology")
+          .insert(copy);
+
+        if(!error)count++;
+      }
+    }
+
+    if(Array.isArray(data.movements)){
+      for(const row of data.movements){
+
+        const copy={
+          ...row,
+          user_id:currentUser.id
+        };
+
+        delete copy.id;
+        delete copy.created_at;
+        delete copy.updated_at;
+
+        const {error}=await db
+          .from("movements")
+          .insert(copy);
+
+        if(!error)count++;
+      }
+    }
+
+    await loadProducts();
+    await loadWorkers();
+    await loadEquipment();
+    await loadMetrology();
+    await loadMovements();
+
+    toast(
+      `تم استرجاع البيانات بنجاح ✅ (${count})`
+    );
+
+  }catch(error){
+
+    console.error(
+      "❌ استرجاع النسخة:",
+      error
+    );
+
+    toast(
+      "ملف النسخة غير صالح ❌"
+    );
+  }
+
+  e.target.value="";
+}
+
+
+/* =========================
+   INSTALL PWA
+========================= */
+
+window.addEventListener(
+  "beforeinstallprompt",
+  e=>{
+    e.preventDefault();
+    deferredPrompt=e;
+    updateInstallButton();
+  }
+);
+
+function updateInstallButton(){
+  const btn=
+    document.getElementById(
+      "installBtn"
+    );
+
+  if(!btn)return;
+
+  btn.style.display=
+    deferredPrompt
+    ?"block"
+    :"none";
+}
+
+async function installApp(){
+  if(!deferredPrompt){
+    return toast(
+      "التطبيق مثبت مسبقاً أو المتصفح لا يدعم التثبيت."
+    );
+  }
+
+  deferredPrompt.prompt();
+
+  const result=
+    await deferredPrompt.userChoice;
+
+  if(result.outcome==="accepted")
+    toast("تم بدء تثبيت التطبيق ✅");
+
+  deferredPrompt=null;
+
+  updateInstallButton();
+}
+
+window.addEventListener(
+  "appinstalled",
+  ()=>{
+    deferredPrompt=null;
+    updateInstallButton();
+
+    toast(
+      "تم تثبيت Stock Pro بنجاح ✅"
+    );
+  }
+);
+
+
+/* =========================
+   SEARCH EVENTS
+========================= */
+
+document.addEventListener(
+  "input",
+  e=>{
+
+    if(e.target.id==="stockSearch")
+      renderProducts();
+
+    if(e.target.id==="workerSearch")
+      renderWorkers();
+
+    if(e.target.id==="equipmentSearch")
+      renderEquipment();
+
+    if(e.target.id==="dueSearch")
+      renderDue();
+
+    if(e.target.id==="userSearch")
+      renderUsers();
+  }
+);
+
+
+/* =========================
+   GLOBAL CLICK
+========================= */
+
+document.addEventListener(
+  "click",
+  e=>{
+
+    if(
+      e.target.classList.contains("modal")
+    ){
+      e.target.classList.remove("show");
+    }
+
+  }
+);
+
+
+/* =========================
+   SUPABASE AUTH
+========================= */
+
+async function initAuth(){
+
+  const {
+    data:{
+      session
+    }
+  }=await db.auth.getSession();
+
+  if(session?.user){
+
+    const ok=
+      await applyUser(session.user);
+
+    if(ok){
+
+      await loadProducts();
+      await loadWorkers();
+      await loadEquipment();
+      await loadMetrology();
+      await loadMovements();
+
+      if(isMasterAdmin())
+        await loadUsers();
+
+      go("home");
+    }
+
+  }else{
+
+    showLogin();
+
+  }
+
+  db.auth.onAuthStateChange(
+    async(event,session)=>{
+
+      console.log(
+        "AUTH:",
+        event
+      );
+
+      if(
+        event==="SIGNED_IN"&&
+        session?.user
+      ){
+
+        const ok=
+          await applyUser(session.user);
+
+        if(ok){
+
+          await loadProducts();
+          await loadWorkers();
+          await loadEquipment();
+          await loadMetrology();
+          await loadMovements();
+
+          if(isMasterAdmin())
+            await loadUsers();
+
+          go("home");
+        }
+
+      }
+
+      if(event==="SIGNED_OUT"){
+
+        currentUser=null;
+        isAdmin=false;
+
+        products=[];
+        workers=[];
+        equipment=[];
+        metrology=[];
+        movements=[];
+        users=[];
+
+        showLogin();
+      }
+
+    }
+  );
+}
+
+
+/* =========================
+   DOM READY
+========================= */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  ()=>{
+
+    console.log(
+      "🚀 Stock Pro v2.5"
+    );
+
+    translateApp();
+
+    const loginForm=
+      document.getElementById(
+        "loginForm"
+      );
+
+    if(loginForm){
+      loginForm.addEventListener(
+        "submit",
+        login
+      );
+    }
+
+    const registerForm=
+      document.getElementById(
+        "registerForm"
+      );
+
+    if(registerForm){
+      registerForm.addEventListener(
+        "submit",
+        registerUser
+      );
+    }
+
+    const workerForm=
+      document.getElementById(
+        "workerForm"
+      );
+
+    if(workerForm){
+      workerForm.addEventListener(
+        "submit",
+        saveWorker
+      );
+    }
+
+    const productForm=
+      document.getElementById(
+        "productForm"
+      );
+
+    if(productForm){
+      productForm.addEventListener(
+        "submit",
+        saveProduct
+      );
+    }
+
+    const equipmentForm=
+      document.getElementById(
+        "equipmentForm"
+      );
+
+    if(equipmentForm){
+      equipmentForm.addEventListener(
+        "submit",
+        saveEquipment
+      );
+    }
+
+    const metrologyForm=
+      document.getElementById(
+        "metrologyForm"
+      );
+
+    if(metrologyForm){
+      metrologyForm.addEventListener(
+        "submit",
+        saveMetrology
+      );
+    }
+
+    const movementForm=
+      document.getElementById(
+        "movementForm"
+      );
+
+    if(movementForm){
+      movementForm.addEventListener(
+        "submit",
+        saveMovement
+      );
+    }
+
+    const restore=
+      document.getElementById(
+        "restoreFile"
+      );
+
+    if(restore){
+      restore.addEventListener(
+        "change",
+        handleRestoreFile
+      );
+    }
+
+    document.querySelectorAll(
+      "[data-page]"
+    ).forEach(btn=>{
+      btn.addEventListener(
+        "click",
+        ()=>{
+          go(btn.dataset.page);
+        }
+      );
+    });
+
+    const lang=
+      document.getElementById(
+        "languageSelect"
+      );
+
+    if(lang){
+      lang.addEventListener(
+        "change",
+        e=>{
+          changeLanguage(
+            e.target.value
+          );
+        }
+      );
+    }
+
+    initAuth();
+
+  }
+);
+
+
+/* =========================
+   GLOBAL FUNCTIONS
+========================= */
+
+window.go=go;
+window.openModal=openModal;
+window.closeModal=closeModal;
+window.closeAllModals=closeAllModals;
+
+window.login=login;
+window.logout=logout;
+window.registerUser=registerUser;
+
+window.togglePassword=
+  togglePassword;
+
+window.changeLanguage=
+  changeLanguage;
+
+window.saveProduct=
+  saveProduct;
+
+window.deleteProduct=
+  deleteProduct;
+
+window.saveWorker=
+  saveWorker;
+
+window.updateWorker=
+  updateWorker;
+
+window.editWorker=
+  editWorker;
+
+window.deleteWorker=
+  deleteWorker;
+
+window.saveEquipment=
+  saveEquipment;
+
+window.deleteEquipment=
+  deleteEquipment;
+
+window.saveMetrology=
+  saveMetrology;
+
+window.deleteMetrology=
+  deleteMetrology;
+
+window.openMovement=
+  openMovement;
+
+window.saveMovement=
+  saveMovement;
+
+window.loadProducts=
+  loadProducts;
+
+window.loadWorkers=
+  loadWorkers;
+
+window.loadEquipment=
+  loadEquipment;
+
+window.loadMetrology=
+  loadMetrology;
+
+window.loadMovements=
+  loadMovements;
+
+window.loadUsers=
+  loadUsers;
+
+window.toggleUserBlock=
+  toggleUserBlock;
+
+window.backupData=
+  backupData;
+
+window.restoreData=
+  restoreData;
+
+window.installApp=
+  installApp;
+
+window.updateInstallButton=
+  updateInstallButton;
+
+console.log(
+  "✅ Stock Pro v2.5 app.js chargé"
+);
