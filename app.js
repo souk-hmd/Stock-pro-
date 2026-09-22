@@ -1,4 +1,3 @@
-// Stock Pro v2.5 - Workers Fixed
 const SUPABASE_URL="https://mpanymikmqajpppipmxy.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_gFcCXJ4jzWl4P8CDBi-uhQ_Gkr1EHa4";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
@@ -45,39 +44,7 @@ function translateApp(){
 }
 function changeLanguage(lang){currentLanguage=lang;localStorage.setItem("stockpro_language",lang);document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";const ls=document.getElementById("languageSelect");if(ls)ls.value=lang;translateApp();renderProducts();renderWorkers();renderEquipment();renderDue();if(isMasterAdmin())renderUsers();updateInstallButton();}
 function isAppInstalled(){return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches||window.matchMedia("(display-mode: minimal-ui)").matches||window.navigator.standalone===true;}
-function updateInstallButton(){
-  const installed=isAppInstalled();
-  const canInstall=!!deferredPrompt;
-  const show=!installed;
-
-  const home=document.getElementById("homeInstallBox");
-  const login=document.getElementById("loginInstallButton");
-  const settings=document.getElementById("installButton");
-  const homeBtn=document.getElementById("homeInstallButton");
-  const help=document.getElementById("installHelp");
-  const loginHelp=document.getElementById("loginInstallHelp");
-
-  if(home) home.style.display=show?"block":"none";
-  if(login) login.style.display=show?"block":"none";
-  if(settings) settings.style.display=show?"block":"none";
-
-  const text=canInstall
-    ?"📲 تثبيت التطبيق"
-    :"📲 تحميل التطبيق";
-
-  if(homeBtn) homeBtn.textContent=text;
-  if(login) login.textContent=text;
-  if(settings) settings.textContent=canInstall
-    ?"📲 تثبيت Stock Pro على الهاتف"
-    :"📲 تحميل Stock Pro على الهاتف";
-
-  const helpText=canInstall
-    ?"اضغط هنا لتثبيت Stock Pro على هاتفك."
-    ?"إذا لم تظهر نافذة التثبيت، افتح قائمة المتصفح واختر «إضافة إلى الشاشة الرئيسية».";
-
-  if(help) help.textContent=helpText;
-  if(loginHelp) loginHelp.textContent=helpText;
-}
+function updateInstallButton(){const installed=isAppInstalled();const home=document.getElementById("homeInstallBox");const login=document.getElementById("loginInstallButton");const settings=document.getElementById("installButton");const show=!installed&&!!deferredPrompt;if(home)home.style.display=show?"block":"none";if(login)login.style.display=show?"block":"none";if(settings)settings.style.display="none";}
 
 async function checkSession(){const {data,error}=await db.auth.getSession();if(error){showLogin();return}if(data.session){if(await applyUser(data.session.user))await loadAll()}else showLogin()}
 function authErrorArabic(error){
@@ -91,38 +58,31 @@ function authErrorArabic(error){
   if(msg.includes("email")&&msg.includes("password")) return "البريد الإلكتروني أو كلمة السر غير صحيحة.";
   return "تعذر تسجيل الدخول: "+(error?.message||"خطأ غير معروف");
 }
+let authLoading=false;
 async function login(e){
   if(e)e.preventDefault();
+  if(authLoading)return;
   const email=document.getElementById("loginEmail").value.trim().toLowerCase();
   const password=document.getElementById("loginPassword").value;
   const btn=document.getElementById("loginBtn");
   document.getElementById("loginError").style.display="none";
   if(!email||!password){showLoginError("أدخل البريد الإلكتروني وكلمة السر.");return}
-  btn.disabled=true;btn.textContent="جاري التحقق...";
+  authLoading=true;btn.disabled=true;btn.textContent="جاري التحقق...";
   try{
     const {data,error}=await db.auth.signInWithPassword({email,password});
-    if(error){
-      console.error("Supabase login error:",error);
-      showLoginError(authErrorArabic(error));
-      return;
-    }
-    if(!data?.user){
-      showLoginError("تمت محاولة الدخول لكن لم يتم العثور على حساب المستخدم.");
-      return;
-    }
-    if(!(await applyUser(data.user)))return;
-    await loadAll();
+    if(error){console.error("Supabase login error:",error);showLoginError(authErrorArabic(error));return;}
+    if(!data?.user){showLoginError("تمت محاولة الدخول لكن لم يتم العثور على حساب المستخدم.");return;}
+    const ok=await applyUser(data.user);
+    if(!ok)return;
+    showApp();
+    loadAll().catch(err=>console.error("loadAll after login:",err));
     toast("تم تسجيل الدخول ✅");
-  }catch(error){
-    console.error("Login exception:",error);
-    showLoginError(authErrorArabic(error));
-  }finally{
-    btn.disabled=false;
-    btn.textContent="دخول إلى التطبيق";
-  }
+  }catch(error){console.error("Login exception:",error);showLoginError(authErrorArabic(error));}
+  finally{authLoading=false;btn.disabled=false;btn.textContent="دخول إلى التطبيق";}
 }
+
 async function logout(){if(!confirm("هل تريد تسجيل الخروج؟"))return;await db.auth.signOut();currentUser=null;isAdmin=false;products=[];workers=[];equipment=[];metrology=[];movements=[];showLogin()}
-db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;isAdmin=false;showLogin()}else if(event==="SIGNED_IN"&&session){setTimeout(async()=>{if(await applyUser(session.user))await loadAll()},0)}});
+db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;isAdmin=false;showLogin()}else if(event==="SIGNED_IN"&&session&&!authLoading){setTimeout(async()=>{if(!currentUser||currentUser.id!==session.user.id){if(await applyUser(session.user))loadAll().catch(e=>console.error("loadAll auth:",e));}},0)}});
 function showPage(id,btn){if(id==="reports")setTimeout(refreshMovementReport,0);if(id==="admin"&&!isAdmin){toast("هذه الصفحة للأدمن فقط ❌");return;}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=document.getElementById(id);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active")}
 function activatePage(id){const b=[...document.querySelectorAll(".nav button")].find(x=>x.getAttribute("onclick")?.includes("'"+id+"'"));showPage(id,b)}
 function closeModal(id){document.getElementById(id).classList.remove("show")}
@@ -332,25 +292,7 @@ async function loadWorkers(){
   renderDue();
   console.log("✅ تم تحميل العمال:",workers.length);
 }
-function renderWorkers(){
-  const box=document.getElementById("workersList");
-  if(!box)return;
-  const q=(document.getElementById("workerSearch")?.value||"").toLowerCase().trim();
-  box.innerHTML="";
-  const list=workers.filter(w=>{
-    const name=String(w.name||"").toLowerCase();
-    const matricule=String(w.matricule||"").toLowerCase();
-    const job=String(w.job||"").toLowerCase();
-    return !q||name.includes(q)||matricule.includes(q)||job.includes(q);
-  });
-  list.forEach(w=>{
-    const d=document.createElement("div");
-    d.className="worker";
-    d.innerHTML=`<div class="worker-main"><div class="worker-info"><div class="worker-icon">👷</div><div><div class="worker-name">${safe(w.name)}</div><div class="worker-matricule">${safe(w.matricule)}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${safe(w.job||"")}</div></div></div><span class="worker-status ${w.status==="inactive"?"inactive":""}">${w.status==="inactive"?"غير نشط":"نشط"}</span></div><div class="product-actions"><button class="small-btn delete" type="button" onclick="deleteWorker('${safe(w.id)}')">🗑️ حذف</button></div>`;
-    box.appendChild(d);
-  });
-  if(!box.children.length)box.innerHTML=`<div class="info-box" style="text-align:center">${q?"لا يوجد عمال مطابقون للبحث.":"لا يوجد عمال."}</div>`;
-}
+function renderWorkers(){const box=document.getElementById("workersList"),q=(document.getElementById("workerSearch")?.value||"").toLowerCase().trim();box.innerHTML="";workers.filter(w=>(w.name||"").toLowerCase().includes(q)||(w.matricule||"").toLowerCase().includes(q)).forEach(w=>{const d=document.createElement("div");d.className="worker";d.innerHTML=`<div class="worker-main"><div class="worker-info"><div class="worker-icon">👷</div><div><div class="worker-name">${safe(w.name)}</div><div class="worker-matricule">${safe(w.matricule)}</div><div style="font-size:11px;color:#6b7280;margin-top:4px">${safe(w.job||"")}</div></div></div><span class="worker-status ${w.status==="inactive"?"inactive":""}">${w.status==="inactive"?"غير نشط":"نشط"}</span></div><div class="product-actions"><button class="small-btn delete" onclick="deleteWorker('${safe(w.id)}')">🗑️ حذف</button></div>`;box.appendChild(d)});if(!box.children.length)box.innerHTML='<div class="info-box" style="text-align:center">لا يوجد عمال.</div>'}
 function openWorker(){document.getElementById("workerMatricule").value="";document.getElementById("workerName").value="";document.getElementById("workerRole").value="";document.getElementById("workerModal").classList.add("show")}
 async function saveWorker(e){
   e.preventDefault();
@@ -555,30 +497,7 @@ async function setUserTemporary(id){
 }
 ["stockSearch","workerSearch","equipmentSearch","dueSearch","userSearch","movementSearch","metrologySearch"].forEach(id=>document.getElementById(id)?.addEventListener("input",()=>{if(id==="stockSearch")renderProducts();else if(id==="workerSearch")renderWorkers();else if(id==="equipmentSearch")renderEquipment();else if(id==="dueSearch")renderDue();else if(id==="movementSearch")renderMovementReport();else if(id==="metrologySearch")renderMetrology();else renderUsers()}));
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){
-  if(isAppInstalled()){
-    updateInstallButton();
-    return;
-  }
-
-  if(!deferredPrompt){
-    updateInstallButton();
-    toast("من قائمة المتصفح اختر «إضافة إلى الشاشة الرئيسية» لتثبيت التطبيق 📲");
-    return;
-  }
-
-  try{
-    await deferredPrompt.prompt();
-    const r=await deferredPrompt.userChoice;
-    deferredPrompt=null;
-    updateInstallButton();
-    if(r?.outcome==="accepted") toast("تم بدء تثبيت التطبيق ✅");
-  }catch(e){
-    console.warn(e);
-    deferredPrompt=null;
-    updateInstallButton();
-  }
-}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){if(isAppInstalled()){updateInstallButton();return}if(!deferredPrompt){updateInstallButton();return}try{await deferredPrompt.prompt();const r=await deferredPrompt.userChoice;deferredPrompt=null;updateInstallButton();if(r?.outcome==="accepted")toast("تم بدء تثبيت التطبيق ✅")}catch(e){console.warn(e);deferredPrompt=null;updateInstallButton()}}
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(e=>console.warn("SW:",e)));
 changeLanguage(currentLanguage);
 updateInstallButton();
@@ -687,3 +606,5 @@ loadTheme();updateNotificationStatus();
  setInterval(refreshAppData,60000);
  setTimeout(refreshAppData,1200);
 })();
+// v2.5 FIX: restore existing Supabase session on app start.
+checkSession().catch(e=>console.error("Session check:",e));
