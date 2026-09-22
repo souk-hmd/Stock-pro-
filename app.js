@@ -632,3 +632,48 @@ loadTheme();updateNotificationStatus();
  setInterval(refreshAppData,60000);
  setTimeout(refreshAppData,1200);
 })();
+
+/* ===== v2.5 INSTALL BUTTON ONLY ===== */
+(function(){
+  function createInstallButton(){
+    if(document.getElementById('stockProInstallButton')) return;
+    const btn=document.createElement('button');
+    btn.id='stockProInstallButton';
+    btn.type='button';
+    btn.textContent='📲 تثبيت التطبيق';
+    btn.style.cssText='position:fixed;bottom:20px;left:20px;z-index:999999;padding:12px 18px;border:0;border-radius:12px;background:#f5b700;color:#111827;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,.3);display:block;';
+    document.body.appendChild(btn);
+
+    btn.addEventListener('click',async function(){
+      if(window.__stockProDeferredPrompt){
+        try{
+          await window.__stockProDeferredPrompt.prompt();
+          await window.__stockProDeferredPrompt.userChoice;
+        }catch(e){console.warn('Install prompt:',e)}
+        window.__stockProDeferredPrompt=null;
+      }else if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true){
+        btn.style.display='none';
+      }else{
+        alert('📲 لتثبيت التطبيق:\n\nاضغط على ⋮ في المتصفح ثم اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».');
+      }
+    });
+  }
+
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();
+    window.__stockProDeferredPrompt=e;
+    createInstallButton();
+  });
+
+  window.addEventListener('appinstalled',function(){
+    const btn=document.getElementById('stockProInstallButton');
+    if(btn)btn.style.display='none';
+    window.__stockProDeferredPrompt=null;
+  });
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',createInstallButton);
+  }else{
+    createInstallButton();
+  }
+})();
