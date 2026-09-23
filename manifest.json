@@ -1,11 +1,24 @@
 {
-  "name":"Stock Pro",
-  "short_name":"Stock Pro",
-  "start_url":"./index.html",
-  "display":"standalone",
-  "background_color":"#111827",
-  "theme_color":"#111827",
-  "lang":"ar",
-  "dir":"rtl",
-  "description":"Stock Pro — Gestion de Stock & Métrologie"
+  "name": "Stock Pro",
+  "short_name": "Stock Pro",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "lang": "ar",
+  "dir": "rtl",
+  "description": "Stock Pro — Gestion de Stock & Métrologie",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
