@@ -4,7 +4,7 @@ const SUPABASE_ANON_KEY="sb_publishable_gFcCXJ4jzWl4P8CDBi-uhQ_Gkr1EHa4";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 const ADMIN_EMAIL="azizsolo.190@gmail.com";
 const MASTER_ADMIN_EMAIL=ADMIN_EMAIL;
-let currentUser=null,isAdmin=false,products=[],workers=[],equipment=[],metrology=[],movements=[],users=[],movementType="entry",deferredPrompt=null;
+let currentUser=null,isAdmin=false,products=[],workers=[],equipment=[],metrology=[],movements=[],users=[],diversItems=[],diversMovements=[],diversSchemaMissing=false,movementType="entry",deferredPrompt=null;
 function todayKey(){return new Date().toISOString().slice(0,10)}
 function formatDate(d){if(!d)return "-";return new Date(d+"T00:00:00").toLocaleDateString("ar-DZ")}
 function addMonths(s,n){const d=new Date(s+"T00:00:00");d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10)}
@@ -43,33 +43,9 @@ function translateApp(){
  document.querySelectorAll("input[placeholder]").forEach(e=>{if(e.id==="stockSearch")e.placeholder=tr("searchProduct");if(e.id==="workerSearch")e.placeholder=tr("searchWorker");if(e.id==="equipmentSearch")e.placeholder=tr("searchEquipment");if(e.id==="dueSearch")e.placeholder=tr("searchDue");if(e.id==="userSearch")e.placeholder=tr("searchUser")});
  const dev=document.getElementById("developerLabel");if(dev)dev.textContent=tr("developer");const loginDev=document.getElementById("loginDeveloperLabel");if(loginDev)loginDev.textContent=tr("developer");
 }
-function changeLanguage(lang){currentLanguage=lang;localStorage.setItem("stockpro_language",lang);document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";const ls=document.getElementById("languageSelect");if(ls)ls.value=lang;translateApp();renderProducts();renderWorkers();renderEquipment();renderDue();if(isMasterAdmin())renderUsers();updateInstallButton();}
+function changeLanguage(lang){currentLanguage=lang;localStorage.setItem("stockpro_language",lang);document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";const ls=document.getElementById("languageSelect");if(ls)ls.value=lang;translateApp();renderProducts();renderWorkers();renderEquipment();renderDue();renderDivers();if(isMasterAdmin())renderUsers();updateInstallButton();}
 function isAppInstalled(){return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches||window.matchMedia("(display-mode: minimal-ui)").matches||window.navigator.standalone===true;}
-function updateInstallButton(){
-  const installed=isAppInstalled();
-  const home=document.getElementById("homeInstallBox");
-  const login=document.getElementById("loginInstallButton");
-  const settings=document.getElementById("installButton");
-  const help=document.getElementById("loginInstallHelp");
-
-  // لا نستعمل زر عائم في أسفل الشاشة. نستعمل الأزرار الموجودة داخل الواجهة فقط.
-  if(installed){
-    if(home)home.style.display="none";
-    if(login)login.style.display="none";
-    if(settings)settings.style.display="none";
-    if(help)help.textContent="";
-    return;
-  }
-
-  // الزر يظهر دائماً عندما التطبيق غير مثبت، حتى لو لم يرسل المتصفح beforeinstallprompt.
-  if(home)home.style.display="block";
-  if(login)login.style.display="block";
-  if(settings)settings.style.display="none";
-  if(help){
-    help.textContent=deferredPrompt?"اضغط هنا لتثبيت التطبيق مباشرة.":"إذا لم تظهر نافذة التثبيت، افتح قائمة المتصفح ⋮ ثم اختر إضافة إلى الشاشة الرئيسية.";
-  }
-}
-
+function updateInstallButton(){const installed=isAppInstalled();const home=document.getElementById("homeInstallBox");const login=document.getElementById("loginInstallButton");const settings=document.getElementById("installButton");const show=!installed&&!!deferredPrompt;if(home)home.style.display=show?"block":"none";if(login)login.style.display=show?"block":"none";if(settings)settings.style.display="none";}
 
 async function checkSession(){const {data,error}=await db.auth.getSession();if(error){showLogin();return}if(data.session){if(await applyUser(data.session.user))await loadAll()}else showLogin()}
 function authErrorArabic(error){
@@ -113,12 +89,12 @@ async function login(e){
     btn.textContent="دخول إلى التطبيق";
   }
 }
-async function logout(){if(!confirm("هل تريد تسجيل الخروج؟"))return;await db.auth.signOut();currentUser=null;isAdmin=false;products=[];workers=[];equipment=[];metrology=[];movements=[];showLogin()}
+async function logout(){if(!confirm("هل تريد تسجيل الخروج؟"))return;await db.auth.signOut();currentUser=null;isAdmin=false;products=[];workers=[];equipment=[];metrology=[];movements=[];diversItems=[];diversMovements=[];showLogin()}
 db.auth.onAuthStateChange((event,session)=>{if(event==="SIGNED_OUT"){currentUser=null;isAdmin=false;showLogin()}else if(event==="SIGNED_IN"&&session){setTimeout(async()=>{if(await applyUser(session.user))await loadAll()},0)}});
 function showPage(id,btn){if(id==="reports")setTimeout(refreshMovementReport,0);if(id==="admin"&&!isAdmin){toast("هذه الصفحة للأدمن فقط ❌");return;}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=document.getElementById(id);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(btn)btn.classList.add("active")}
 function activatePage(id){const b=[...document.querySelectorAll(".nav button")].find(x=>x.getAttribute("onclick")?.includes("'"+id+"'"));showPage(id,b)}
 function closeModal(id){document.getElementById(id).classList.remove("show")}
-async function loadAll(){await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements()]);statistics();renderDue();renderEquipment();renderMetrology();renderHomeProducts()}
+async function loadAll(){await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements(),loadDivers()]);statistics();renderDue();renderEquipment();renderMetrology();renderHomeProducts();renderDivers()}
 async function loadProducts(){const {data,error}=await db.from("products").select("*").eq("user_id",currentUser.id).order("name");if(error){toast("خطأ في تحميل المنتجات ❌");console.error(error);return}products=data||[];renderProducts()}
 let stockFilter="all";
 function setStockFilter(filter){stockFilter=filter||"all";renderProducts();}
@@ -204,7 +180,9 @@ function buildBackupPayload(){
       movements:movements||[],
       workers:workers||[],
       equipment:equipment||[],
-      metrology:metrology||[]
+      metrology:metrology||[],
+      divers_items:diversItems||[],
+      divers_movements:diversMovements||[]
     }
   };
 }
@@ -213,10 +191,10 @@ async function exportStockBackup(){
   try{
     setBackupStatus('🔄 جاري تجهيز النسخة الاحتياطية...');
     /* Refresh all four tables first so the exported file contains the latest server data. */
-    await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements()]);
+    await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements(),loadDivers()]);
     const payload=buildBackupPayload();
     downloadBackupObject(payload,backupFileName());
-    const total=(payload.data.products.length+payload.data.movements.length+payload.data.workers.length+payload.data.equipment.length+payload.data.metrology.length);
+    const total=(payload.data.products.length+payload.data.movements.length+payload.data.workers.length+payload.data.equipment.length+payload.data.metrology.length+(payload.data.divers_items||[]).length+(payload.data.divers_movements||[]).length);
     setBackupStatus(`✅ تم تصدير النسخة بنجاح — ${total} سجل`,true);
     toast('تم إنشاء النسخة الاحتياطية ✅');
   }catch(e){console.error(e);setBackupStatus('❌ تعذر إنشاء النسخة الاحتياطية');toast('تعذر إنشاء النسخة الاحتياطية ❌');}
@@ -241,17 +219,18 @@ async function restoreStockBackup(event){
     const payload=validateBackupPayload(JSON.parse(text));
     const d=payload.data;
     d.metrology=Array.isArray(d.metrology)?d.metrology:[];
-    const count=d.products.length+d.movements.length+d.workers.length+d.equipment.length+d.metrology.length;
+    d.divers_items=Array.isArray(d.divers_items)?d.divers_items:[];d.divers_movements=Array.isArray(d.divers_movements)?d.divers_movements:[];
+    const count=d.products.length+d.movements.length+d.workers.length+d.equipment.length+d.metrology.length+d.divers_items.length+d.divers_movements.length;
     const sameUser=payload.user_id&&payload.user_id===currentUser.id;
     const msg=`سيتم استرجاع ${count} سجل إلى حسابك.\n\nالبيانات الحالية للمنتجات والحركات والعمال والتجهيزات سيتم استبدالها.\n\n${sameUser?'النسخة تخص نفس الحساب.':'النسخة من حساب/جهاز آخر؛ سيتم ربط البيانات بحسابك الحالي.'}\n\nقبل الاسترجاع سيتم تنزيل نسخة أمان من البيانات الحالية تلقائياً.\n\nهل تريد المتابعة؟`;
     if(!confirm('⚠️ تأكيد الاسترجاع\n\n'+msg)){input.value='';setBackupStatus('تم إلغاء الاسترجاع.');return;}
     /* Safety copy of current data before any destructive operation. */
-    await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements()]);
+    await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements(),loadDivers()]);
     downloadBackupObject(buildBackupPayload(),`Stock_Pro_PreRestore_${new Date().toISOString().slice(0,10)}.json`);
     setBackupStatus('🔄 جاري استبدال البيانات...');
     const uid=currentUser.id;
     /* Delete dependent rows first to avoid foreign-key conflicts. */
-    for(const table of ['metrology','equipment','movements','workers','products']){
+    for(const table of ['divers_movements','divers_items','metrology','equipment','movements','workers','products']){
       const {error}=await db.from(table).delete().eq('user_id',uid);
       if(error)throw new Error(`تعذر تنظيف ${table}: ${errText(error)}`);
     }
@@ -267,8 +246,10 @@ async function restoreStockBackup(event){
     await insertBatch('equipment',d.equipment);
     await insertBatch('metrology',d.metrology);
     await insertBatch('movements',d.movements);
-    await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements()]);
-    statistics();renderDue();renderEquipment();renderMetrology();renderHomeProducts();renderV22Alerts();
+    await insertBatch('divers_items',d.divers_items);
+    await insertBatch('divers_movements',d.divers_movements);
+    await Promise.all([loadProducts(),loadWorkers(),loadEquipment(),loadMetrology(),loadMovements(),loadDivers()]);
+    statistics();renderDue();renderEquipment();renderMetrology();renderHomeProducts();renderDivers();renderV22Alerts();
     setBackupStatus(`✅ تم الاسترجاع بنجاح — ${count} سجل`,true);
     toast('تم استرجاع النسخة الاحتياطية بنجاح ✅');
   }catch(e){
@@ -477,7 +458,7 @@ function renderMetrology(){
   const box=document.getElementById("metrologyList");if(!box)return;const q=(document.getElementById("metrologySearch")?.value||"").toLowerCase().trim();box.innerHTML="";
   let valid=0,soon=0,expired=0;
   const list=metrology.filter(x=>`${x.name||""} ${x.reference||""} ${x.serial_number||""}`.toLowerCase().includes(q));
-  list.forEach(x=>{const st=metrologyStatus(x.expiry_date);if(st==="notdue")valid++;else if(st==="soon")soon++;else if(st==="due")expired++;const d=document.createElement("div");d.className="equipment";d.innerHTML=`<div class="equipment-top"><div class="equipment-info"><div class="equipment-icon">📏</div><div><div class="equipment-name">${safe(x.name)}</div><div class="worker-matricule">${safe(x.reference||"بدون Référence")} ${x.serial_number?" · S/N "+safe(x.serial_number):""}</div></div><span class="status status-${st}">${st==="due"?"منتهي":st==="soon"?"قريب الانتهاء":"صالح"}</span></div><div style="margin-top:10px"><div class="equipment-duration">📅 تاريخ الطالوناج: <b>${formatDate(x.calibration_date)}</b></div><div class="equipment-duration">⏱️ مدة الطالوناج: <b>${metrologyDurationLabel(x.calibration_duration_months)}</b></div><div class="equipment-duration">📅 نهاية الطالوناج: <b>${formatDate(x.expiry_date)}</b></div><div style="font-weight:bold;margin-top:5px" class="equip-state-${st}">${metrologyRemaining(x.expiry_date)}</div>${x.note?`<div class="equipment-duration">📝 ${safe(x.note)}</div>`:""}</div><div class="product-actions" style="margin-top:10px"><button class="small-btn edit" onclick="openMetrology('${safe(x.id)}')">✏️ تعديل</button><button class="small-btn delete" onclick="deleteMetrology('${safe(x.id)}')">🗑️ حذف</button></div>`;box.appendChild(d)});
+  list.forEach(x=>{const st=metrologyStatus(x.expiry_date);if(st==="notdue")valid++;else if(st==="soon")soon++;else if(st==="due")expired++;const d=document.createElement("div");d.className="equipment";d.innerHTML=`<div class="equipment-top"><div class="equipment-info"><div class="equipment-icon">📏</div><div><div class="equipment-name">${safe(x.name)}</div><div class="worker-matricule">${safe(x.reference||"بدون Référence")} ${x.serial_number?" · S/N "+safe(x.serial_number):""}</div></div><span class="status metrology-status-${st}">${st==="due"?"منتهي":st==="soon"?"قريب الانتهاء":"صالح"}</span></div><div style="margin-top:10px"><div class="equipment-duration">📅 تاريخ الطالوناج: <b>${formatDate(x.calibration_date)}</b></div><div class="equipment-duration">⏱️ مدة الطالوناج: <b>${metrologyDurationLabel(x.calibration_duration_months)}</b></div><div class="equipment-duration">📅 نهاية الطالوناج: <b>${formatDate(x.expiry_date)}</b></div><div style="font-weight:bold;margin-top:5px" class="equip-state-${st}">${metrologyRemaining(x.expiry_date)}</div>${x.note?`<div class="equipment-duration">📝 ${safe(x.note)}</div>`:""}</div><div class="product-actions" style="margin-top:10px"><button class="small-btn edit" onclick="openMetrology('${safe(x.id)}')">✏️ تعديل</button><button class="small-btn delete" onclick="deleteMetrology('${safe(x.id)}')">🗑️ حذف</button></div>`;box.appendChild(d)});
   const stats=document.getElementById("metrologyStats");if(stats)stats.innerHTML=`<div class="stat"><div class="icon green">🟢</div><div><span>صالح</span><strong>${valid}</strong></div></div><div class="stat"><div class="icon orange">🟡</div><div><span>قريب الانتهاء</span><strong>${soon}</strong></div></div><div class="stat"><div class="icon red">🔴</div><div><span>منتهي</span><strong>${expired}</strong></div></div>`;
   if(!box.children.length)box.innerHTML='<div class="info-box" style="text-align:center">لا توجد معدات ميترولوجي مسجلة.</div>';
 }
@@ -547,32 +528,91 @@ async function setUserTemporary(id){
 }
 ["stockSearch","workerSearch","equipmentSearch","dueSearch","userSearch","movementSearch","metrologySearch"].forEach(id=>document.getElementById(id)?.addEventListener("input",()=>{if(id==="stockSearch")renderProducts();else if(id==="workerSearch")renderWorkers();else if(id==="equipmentSearch")renderEquipment();else if(id==="dueSearch")renderDue();else if(id==="movementSearch")renderMovementReport();else if(id==="metrologySearch")renderMetrology();else renderUsers()}));
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
-window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){
-  if(isAppInstalled()){updateInstallButton();return}
-  if(!deferredPrompt){
-    const help=document.getElementById("loginInstallHelp");
-    if(help){
-      help.textContent="📲 افتح قائمة المتصفح ⋮ ثم اختر «إضافة إلى الشاشة الرئيسية» أو «تثبيت التطبيق».";
-    }
-    toast("من قائمة المتصفح ⋮ اختر إضافة إلى الشاشة الرئيسية 📲");
-    return;
-  }
-  try{
-    await deferredPrompt.prompt();
-    const r=await deferredPrompt.userChoice;
-    deferredPrompt=null;
-    updateInstallButton();
-    if(r?.outcome==="accepted")toast("تم بدء تثبيت التطبيق ✅");
-  }catch(e){
-    console.warn(e);
-    deferredPrompt=null;
-    updateInstallButton();
-  }
-}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;updateInstallButton()});window.addEventListener("appinstalled",()=>{deferredPrompt=null;updateInstallButton();toast("تم تثبيت Stock Pro على الهاتف ✅")});async function installApp(){if(isAppInstalled()){updateInstallButton();return}if(!deferredPrompt){updateInstallButton();return}try{await deferredPrompt.prompt();const r=await deferredPrompt.userChoice;deferredPrompt=null;updateInstallButton();if(r?.outcome==="accepted")toast("تم بدء تثبيت التطبيق ✅")}catch(e){console.warn(e);deferredPrompt=null;updateInstallButton()}}
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(e=>console.warn("SW:",e)));
 changeLanguage(currentLanguage);
 updateInstallButton();
 window.addEventListener("pageshow",updateInstallButton);
+
+
+
+/* ===== DIVERS independent inventory (v2.6 addition) ===== */
+function diversText(ar,fr,en){return currentLanguage==='fr'?fr:currentLanguage==='en'?en:ar}
+async function loadDivers(){
+  if(!currentUser)return;
+  const [ir,mr]=await Promise.all([
+    db.from('divers_items').select('*').eq('user_id',currentUser.id).order('name'),
+    db.from('divers_movements').select('*').eq('user_id',currentUser.id).order('created_at',{ascending:false}).limit(300)
+  ]);
+  if(ir.error||mr.error){console.error('DIVERS load:',ir.error||mr.error);const e=ir.error||mr.error;if(/does not exist|schema cache|Could not find the table/i.test(e.message||'')){diversSchemaMissing=true;const box=document.getElementById('diversItemsList');if(box)box.innerHTML='<div class="info-box">يجب إنشاء جداول DIVERS في Supabase أولاً. افتح الملف <b>SUPABASE_DIVERS_SETUP.sql</b> ونفّذ محتواه في SQL Editor.</div>';}else toast('تعذر تحميل DIVERS: '+errText(e));return;}
+  diversSchemaMissing=false;diversItems=ir.data||[];diversMovements=mr.data||[];renderDivers();
+}
+function openDiversItem(id=null){
+  if(!currentUser)return toast('يجب تسجيل الدخول أولاً ❌');
+  const edit=!!id;const item=edit?diversItems.find(x=>String(x.id)===String(id)):null;if(edit&&!item)return;
+  document.getElementById('diversItemId').value=item?.id||'';
+  document.getElementById('diversItemTitle').textContent=edit?diversText('تعديل مادة DIVERS','Modifier un article DIVERS','Edit DIVERS item'):diversText('إضافة مادة إلى DIVERS','Ajouter un article — DIVERS','Add DIVERS item');
+  document.getElementById('diversItemName').value=item?.name||'';
+  document.getElementById('diversItemReference').value=item?.reference||'';
+  document.getElementById('diversItemInitial').value='0';
+  document.getElementById('diversItemInitial').disabled=edit;
+  document.getElementById('diversItemNote').value=item?.note||'';
+  document.getElementById('diversEditHint').style.display=edit?'block':'none';
+  document.getElementById('diversItemModal').classList.add('show');
+}
+async function saveDiversItem(e){
+  e.preventDefault();if(!currentUser)return toast('يجب تسجيل الدخول أولاً ❌');
+  const id=document.getElementById('diversItemId').value;
+  const name=document.getElementById('diversItemName').value.trim();
+  const reference=document.getElementById('diversItemReference').value.trim();
+  const note=document.getElementById('diversItemNote').value.trim();
+  const initial=Math.max(0,Number(document.getElementById('diversItemInitial').value)||0);
+  if(!name)return toast('أدخل اسم المادة ❌');
+  if(id){const {error}=await db.from('divers_items').update({name,reference,note}).eq('id',id).eq('user_id',currentUser.id);if(error)return toast('تعذر تعديل المادة: '+errText(error));closeModal('diversItemModal');await loadDivers();toast('تم تعديل المادة ✅');return;}
+  const {data,error}=await db.from('divers_items').insert({user_id:currentUser.id,name,reference,note,quantity:0}).select('*').single();
+  if(error)return toast('تعذر إضافة المادة: '+errText(error));
+  closeModal('diversItemModal');await loadDivers();
+  if(initial>0){const r=await db.rpc('divers_apply_movement',{p_item_id:data.id,p_type:'entry',p_quantity:initial,p_note:diversText('المخزون الأولي','Stock initial','Initial stock')});if(r.error){console.error(r.error);toast('أضيفت المادة لكن تعذر تسجيل الكمية الأولية. سجل Entrée يدويًا: '+errText(r.error));await loadDivers();return;}await loadDivers();}
+  toast('تمت إضافة المادة إلى DIVERS ✅');
+}
+async function deleteDiversItem(id){
+  const item=diversItems.find(x=>String(x.id)===String(id));if(!item)return;
+  if(!confirm(diversText('حذف المادة من DIVERS؟ سيبقى سجل الحركات محفوظًا.\n\n','Supprimer cet article ? L’historique des mouvements sera conservé.\n\n','Delete this item? Movement history will be retained.\n\n')+item.name))return;
+  const {error}=await db.from('divers_items').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error)return toast('تعذر حذف المادة: '+errText(error));
+  await loadDivers();toast('تم حذف المادة مع الاحتفاظ بالسجل السابق ✅');
+}
+function openDiversMovement(id,type){
+  const item=diversItems.find(x=>String(x.id)===String(id));if(!item)return;
+  if(type==='exit'&&Number(item.quantity||0)<=0)return toast('المخزون فارغ، لا يمكن تسجيل خروج ❌');
+  document.getElementById('diversMovementType').value=type;
+  document.getElementById('diversMovementItemId').value=item.id;
+  document.getElementById('diversMovementItemName').value=`${item.name} — Stock: ${Number(item.quantity||0)}`;
+  document.getElementById('diversMovementTitle').textContent=type==='entry'?diversText('دخول المخزون — Entrée','Entrée de stock','Stock entry'):diversText('خروج المخزون — Sortie','Sortie de stock','Stock exit');
+  document.getElementById('diversMovementQty').value='';
+  document.getElementById('diversMovementNote').value='';
+  document.getElementById('diversMovementModal').classList.add('show');
+}
+async function saveDiversMovement(e){
+  e.preventDefault();if(!currentUser)return toast('يجب تسجيل الدخول أولاً ❌');
+  const id=document.getElementById('diversMovementItemId').value,type=document.getElementById('diversMovementType').value,qty=Number(document.getElementById('diversMovementQty').value),note=document.getElementById('diversMovementNote').value.trim();
+  if(!id||!['entry','exit'].includes(type)||!Number.isFinite(qty)||qty<=0)return toast('تحقق من المادة والكمية ❌');
+  const item=diversItems.find(x=>String(x.id)===String(id));if(!item)return toast('المادة غير موجودة ❌');
+  if(type==='exit'&&qty>Number(item.quantity||0))return toast('الكمية المطلوبة أكبر من المخزون المتوفر ❌');
+  const {error}=await db.rpc('divers_apply_movement',{p_item_id:id,p_type:type,p_quantity:qty,p_note:note});
+  if(error){console.error(error);return toast('تعذر تسجيل الحركة: '+errText(error)+' — تحقق من تنفيذ ملف SQL الخاص بـ DIVERS.');}
+  closeModal('diversMovementModal');await loadDivers();toast(type==='entry'?'تم تسجيل دخول المخزون وتحديث الكمية ✅':'تم تسجيل خروج المخزون وتحديث الكمية ✅');
+}
+function renderDivers(){
+  const box=document.getElementById('diversItemsList');if(!box)return;if(diversSchemaMissing){box.innerHTML='<div class="info-box">يجب إنشاء جداول DIVERS في Supabase أولاً. افتح الملف <b>SUPABASE_DIVERS_SETUP.sql</b> ونفّذ محتواه في SQL Editor.</div>';const h=document.getElementById('diversHistory');if(h)h.innerHTML='<tr><td colspan="7">يلزم إعداد جداول DIVERS في Supabase.</td></tr>';return;}
+  const q=(document.getElementById('diversSearch')?.value||'').toLowerCase().trim();box.innerHTML='';
+  const list=diversItems.filter(x=>`${x.name||''} ${x.reference||''} ${x.note||''}`.toLowerCase().includes(q));
+  const totalQty=diversItems.reduce((a,x)=>a+Number(x.quantity||0),0);
+  const stats=document.getElementById('diversStats');if(stats)stats.innerHTML=`<div class="stat"><div class="icon blue">📦</div><div><span>${diversText('عدد المواد','Articles','Items')}</span><strong>${diversItems.length}</strong></div></div><div class="stat"><div class="icon green">📊</div><div><span>${diversText('إجمالي الكمية','Quantité totale','Total quantity')}</span><strong>${totalQty}</strong></div></div>`;
+  list.forEach(x=>{const d=document.createElement('div');d.className='equipment';d.innerHTML=`<div class="equipment-top"><div class="equipment-info"><div class="equipment-icon">📦</div><div><div class="equipment-name">${safe(x.name)}</div><div class="worker-matricule">${safe(x.reference||diversText('بدون مرجع','Sans référence','No reference'))}</div></div></div><div class="divers-qty">${Number(x.quantity||0)}</div></div>${x.note?`<div class="equipment-duration">📝 ${safe(x.note)}</div>`:''}<div class="divers-card-actions"><button class="small-btn success" onclick="openDiversMovement('${safe(x.id)}','entry')">📥 Entrée</button><button class="small-btn delete" onclick="openDiversMovement('${safe(x.id)}','exit')">📤 Sortie</button><button class="small-btn edit" onclick="openDiversItem('${safe(x.id)}')">✏️ ${diversText('تعديل','Modifier','Edit')}</button><button class="small-btn delete" onclick="deleteDiversItem('${safe(x.id)}')">🗑️ ${diversText('حذف','Supprimer','Delete')}</button></div>`;box.appendChild(d)});
+  if(!box.children.length)box.innerHTML=`<div class="info-box" style="text-align:center">${diversText('لا توجد مواد في DIVERS. اضغط إضافة للبدء.','Aucun article dans DIVERS. Cliquez sur Ajouter.','No DIVERS items yet. Click Add to start.')}</div>`;
+  const hist=document.getElementById('diversHistory');if(hist){hist.innerHTML='';diversMovements.slice(0,200).forEach(m=>{const tr=document.createElement('tr');const date=m.created_at?new Date(m.created_at).toLocaleString(currentLanguage==='fr'?'fr-FR':currentLanguage==='en'?'en-US':'ar-DZ'):'-';tr.innerHTML=`<td style="white-space:nowrap">${safe(date)}</td><td>${safe(m.item_name||'—')}</td><td class="${m.type==='entry'?'divers-history-entry':'divers-history-exit'}">${m.type==='entry'?diversText('دخول','Entrée','Entry'):diversText('خروج','Sortie','Exit')}</td><td>${Number(m.quantity||0)}</td><td>${Number(m.before_quantity||0)}</td><td>${Number(m.after_quantity||0)}</td><td>${safe(m.note||'—')}</td>`;hist.appendChild(tr)});if(!hist.children.length)hist.innerHTML=`<tr><td colspan="7" style="text-align:center">${diversText('لا توجد حركات مسجلة.','Aucun mouvement enregistré.','No movements recorded.')}</td></tr>`;}
+}
 
 /* ===== v2.1 dashboard/theme ===== */
 function setTheme(theme){
@@ -666,7 +706,7 @@ loadTheme();updateNotificationStatus();
  async function refreshAppData(){
   try{
    show('🔄 جاري تحديث البيانات...');
-   const fns=['loadProducts','loadWorkers','loadEquipment','loadMovements','loadTransactions','renderDashboard','renderProducts','renderWorkers','renderEquipment','renderMovements','updateDashboard','updateStats','updateTodayStats','updateDueItems'];
+   const fns=['loadProducts','loadWorkers','loadEquipment','loadMovements','loadDivers','loadTransactions','renderDashboard','renderProducts','renderWorkers','renderEquipment','renderMovements','updateDashboard','updateStats','updateTodayStats','updateDueItems'];
    for(const n of fns) if(typeof window[n]==='function'){try{await window[n]()}catch(e){console.warn(n,e)}}
    show('✅ تم تحديث البيانات');
   }catch(e){console.error(e);show('⚠️ تعذر تحديث بعض البيانات')}
